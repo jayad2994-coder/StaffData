@@ -1547,12 +1547,24 @@ function showSection(sectionId) {
 
 
 // 1. GLOBAL STATE
-// 1. GLOBAL STATE
-let currentUser = { email: '', name: '', role: '' };
+// 1. GLOBAL STATElet currentUser = { email: '', name: '', role: '' };
 let tempUserForOTP = '';
 
+// --- CONFIGURATION CONSTANTS (MUST MATCH CODE.GS) ---
+const SECURITY_SECRET_KEY = "TNTEU_Staff_Secure_Key_2026!#";
+const APPS_SCRIPT_EXEC_URL = "https://script.google.com/macros/s/AKfycbyvxtJpwzTRlForHzWc2Sw8O3tFZZLFLfjrjWuqMIDQNMJCUI3oxTU1bQO4i_GyZYlDig/exec";
+
+// Helper to reset the login button interface state
+function resetLoginButton() {
+    const btn = document.getElementById('loginBtn');
+    if (btn) {
+        btn.innerText = "Login";
+        btn.disabled = false;
+    }
+}
+
 // 2. LOGIN LOGIC (STEP 1)
-function onLoginSubmit() {
+async function onLoginSubmit() {
     const email = document.getElementById('emailInput').value;
     const pass = document.getElementById('passwordInput').value;
     const btn = document.getElementById('loginBtn');
@@ -1562,30 +1574,54 @@ function onLoginSubmit() {
     // UI Feedback
     btn.innerText = "Sending OTP...";
     btn.disabled = true;
-    showLoader(); // Show spinner
+    if (typeof showLoader === "function") showLoader(); 
 
-    google.script.run
-        .withSuccessHandler(res => {
-            hideLoader();
-            if (res.success) {
-                tempUserForOTP = email; 
-                document.getElementById('credentialsSection').classList.add('hidden');
-                document.getElementById('otpSection').classList.remove('hidden');
-            } else {
-                alert(res.error);
-                resetLoginButton();
-            }
-        })
-        .withFailureHandler(err => {
-            hideLoader();
-            alert("Server Error: " + err);
+    // Construct the structured JSON router payload packet
+    const payloadData = {
+        action: "login",
+        username: email,
+        password: pass,
+        requestTimestamp: new Date().getTime()
+    };
+
+    try {
+        const stringifiedBody = JSON.stringify(payloadData);
+        const calculatedHash = CryptoJS.HmacSHA256(stringifiedBody, SECURITY_SECRET_KEY);
+        const hexSignature = CryptoJS.enc.Hex.stringify(calculatedHash);
+        const finalTargetUrl = `${APPS_SCRIPT_EXEC_URL}?signature=${hexSignature}`;
+
+        // Send payload via white-label secure network endpoint
+        const response = await fetch(finalTargetUrl, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: stringifiedBody
+        });
+
+        const res = await response.json();
+        if (typeof hideLoader === "function") hideLoader();
+
+        // Interpret status code results returned via the system backend router
+        if (res.status === "success") {
+            tempUserForOTP = email; 
+            document.getElementById('credentialsSection').classList.add('hidden');
+            document.getElementById('otpSection').classList.remove('hidden');
+        } else {
+            alert(res.message || "Invalid authentication parameters.");
             resetLoginButton();
-        })
-        .checkLogin(email, pass);
+        }
+    } catch (err) {
+        if (typeof hideLoader === "function") hideLoader();
+        console.error("Network Exception Log:", err);
+        alert("Server Error: Unable to complete authentication transport.");
+        resetLoginButton();
+    }
 }
 
 // 3. OTP LOGIC (STEP 2)
-function onVerifyOTP() {
+async function onVerifyOTP() {
     const otp = document.getElementById('otpInput').value;
     const btn = document.getElementById('verifyBtn');
 
@@ -1593,31 +1629,55 @@ function onVerifyOTP() {
 
     btn.innerText = "Verifying...";
     btn.disabled = true;
-    showLoader();
+    if (typeof showLoader === "function") showLoader();
 
-    google.script.run
-        .withSuccessHandler(res => {
-            hideLoader();
-            if (res.success) {
-                // IMPORTANT: Ensure your .gs returns 'name'
-                currentUser.name = res.name || "User"; 
-                currentUser.role = res.role;
-                currentUser.email = tempUserForOTP;
-                showDashboard();
-            } else {
-                alert(res.error);
-                btn.innerText = "Verify & Login";
-                btn.disabled = false;
-            }
-        })
-        .withFailureHandler(err => {
-            hideLoader();
-            alert("Connection Lost: " + err);
+    // Construct the verification payload token packet
+    const payloadData = {
+        action: "verifyOTP",
+        username: tempUserForOTP,
+        otp: otp,
+        requestTimestamp: new Date().getTime()
+    };
+
+    try {
+        const stringifiedBody = JSON.stringify(payloadData);
+        const calculatedHash = CryptoJS.HmacSHA256(stringifiedBody, SECURITY_SECRET_KEY);
+        const hexSignature = CryptoJS.enc.Hex.stringify(calculatedHash);
+        const finalTargetUrl = `${APPS_SCRIPT_EXEC_URL}?signature=${hexSignature}`;
+
+        const response = await fetch(finalTargetUrl, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: stringifiedBody
+        });
+
+        const res = await response.json();
+        if (typeof hideLoader === "function") hideLoader();
+
+        if (res.status === "success" && res.data) {
+            // Map parameters successfully out of data data payload vector models
+            currentUser.name = res.data.name || "User"; 
+            currentUser.role = res.data.role;
+            currentUser.email = tempUserForOTP;
+            
+            if (typeof showDashboard === "function") showDashboard();
+        } else {
+            alert(res.message || "Invalid OTP verification code entry string.");
             btn.innerText = "Verify & Login";
             btn.disabled = false;
-        })
-        .verifyOTP(tempUserForOTP, otp);
+        }
+    } catch (err) {
+        if (typeof hideLoader === "function") hideLoader();
+        console.error("OTP Processing Error Intercept:", err);
+        alert("Connection Lost: Unable to communicate verification matrix.");
+        btn.innerText = "Verify & Login";
+        btn.disabled = false;
+    }
 }
+
 
 // 4. UI HELPERS
 // 4. UI HELPERS
@@ -1828,6 +1888,7 @@ function applyFilter(value, isInitial = false) {
 
 
 async function handleFormSubmit(formObject) {
+
     const btn = document.getElementById('submitBtn');
     if (btn.disabled) return false; 
 
@@ -1967,11 +2028,12 @@ async function handleFormSubmit(formObject) {
             formData['name'] = nameInput.value.toUpperCase().trim();
         }
 
-        // --- CRYPTOGRAPHIC NETWORK SECURITY LAYER ---
-        const SECRET_KEY = "TNTEU_Staff_Secure_Key_2026!#"; // MUST MATCH APPS SCRIPT
-        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyvxtJpwzTRlForHzWc2Sw8O3tFZZLFLfjrjWuqMIDQNMJCUI3oxTU1bQO4i_GyZYlDig/exec"; // Replace XXXXXX with live exec URL
 
-        // Inject data structure definitions required by original Apps Script legacy parameter orders
+
+        // --- CRYPTOGRAPHIC NETWORK SECURITY LAYER ---
+        const SECRET_KEY = "TNTEU_Staff_Secure_Key_2026!#"; 
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyvxtJpwzTRlForHzWc2Sw8O3tFZZLFLfjrjWuqMIDQNMJCUI3oxTU1bQO4i_GyZYlDig/exec"; 
+
         const packetData = {
             formData: formData,
             userEmail: userEmail
@@ -2002,29 +2064,24 @@ async function handleFormSubmit(formObject) {
 
             // 1. FIRST: CRITICAL IMAGE CLEAR (Runs before form reset)
             try {
-                // Kill file selector caches completely
                 const fileInputs = document.querySelectorAll('input[type="file"]');
                 fileInputs.forEach(input => {
                     input.value = ""; 
-                    // Force trigger a change event to clear custom upload widgets
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                 });
 
-                // Completely wipe image preview sources out of memory cache
                 const imgPreview = document.getElementById('imagePreview');
                 if (imgPreview) {
                     imgPreview.removeAttribute('src'); 
-                    imgPreview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // Blank 1px transparent GIF fallback
+                    imgPreview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; 
                 }
 
-                // Hide the container element safely
                 const prevContainer = document.getElementById('previewContainer');
                 if (prevContainer) {
                     prevContainer.classList.add('hidden');
-                    prevContainer.style.setProperty('display', 'none', 'important'); // Overrides styling blocks
+                    prevContainer.style.setProperty('display', 'none', 'important'); 
                 }
 
-                // Execute custom wrapper reset if available
                 if (typeof clearForm === "function") clearForm();
                 if (typeof clearPasteArea === "function") clearPasteArea();
 
@@ -2063,9 +2120,9 @@ async function handleFormSubmit(formObject) {
             if (typeof loadRecords === "function") loadRecords(); 
             
             const pd = document.getElementById('pdate');
-            if(pd) { 
-                pd.readOnly = false; 
-                pd.classList.remove('bg-gray-100'); 
+            if (pd) {
+                pd.readOnly = false;
+                pd.classList.remove('bg-gray-100');
             }
         } else {
             btn.disabled = false;
@@ -2081,6 +2138,7 @@ async function handleFormSubmit(formObject) {
     
     return false;
 }
+
 
 
 
@@ -3418,5 +3476,4 @@ document.getElementById('photoFile').addEventListener('change', function(event) 
 
 </body>
 </html>
-
 
