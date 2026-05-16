@@ -1,0 +1,3422 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <base target="_top">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      
+
+        .hidden { display: none; }
+
+        @media print {
+    @page { size: landscape; margin: 5mm; }
+    body * { visibility: hidden; }
+    #recordsContainer, #recordsContainer * { visibility: visible; }
+    #recordsContainer { position: absolute; left: 0; top: 0; width: 100%; }
+    
+    /* Shrink font for printing many columns */
+    table { font-size: 8px !important; border-spacing: 0; width: 100%; }
+    th, td { padding: 2px !important; border: 1px solid #ccc !important; }
+    #searchInput, button { display: none !important; } /* Hide buttons on print */
+}
+
+@keyframes customBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.custom-blink-effect {
+    animation: customBlink 1.2s infinite ease-in-out;
+}
+
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+<!-- Login Page -->
+
+<!-- Login Page -->
+<div id="loginPage" class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-md w-96">
+        <h2 id="loginTitle" class="text-2xl font-bold mb-6 text-center">TNTEU STAFF LOGIN</h2>
+        
+        <!-- STEP 1: Credentials (Visible by default) -->
+        <div id="credentialsSection">
+            <input type="text" id="emailInput" autocomplete="off" placeholder="Username" class="w-full p-2 mb-4 border rounded">
+            <input type="password" id="passwordInput" autocomplete="off" placeholder="Password" class="w-full p-2 mb-6 border rounded">
+            <button id="loginBtn" onclick="onLoginSubmit()" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Get OTP</button>
+        </div>
+
+        <!-- STEP 2: OTP (Hidden by default) -->
+        <div id="otpSection" class="hidden">
+            <p class="text-sm text-gray-600 mb-4 text-center">Enter the 6-digit code sent to your email.</p>
+            <input type="text" id="otpInput" autocomplete="off" maxlength="6" placeholder="000000" class="w-full p-2 mb-6 border rounded text-center text-2xl tracking-widest">
+            <button id="verifyBtn" onclick="onVerifyOTP()" class="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">Verify & Login</button>
+            <button onclick="location.reload()" class="w-full mt-2 text-xs text-blue-500 underline">Back to Login</button>
+        </div>
+    </div>
+</div>
+
+<script>
+  let currentUsername = ""; // To store username between steps
+
+  function onLoginSubmit() {
+    const user = document.getElementById('emailInput').value;
+    const pass = document.getElementById('passwordInput').value;
+    const btn = document.getElementById('loginBtn');
+
+    if (!user || !pass) return alert("Please enter both fields");
+
+    btn.disabled = true;
+    btn.innerText = "Checking...";
+
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success && response.otpSent) {
+          currentUsername = response.username; // Save for the next step
+          
+          // Switch UI to OTP mode
+          document.getElementById('credentialsSection').classList.add('hidden');
+          document.getElementById('otpSection').classList.remove('hidden');
+          document.getElementById('loginTitle').innerText = "Verify OTP";
+        } else {
+          alert(response.error || "Login failed");
+          btn.disabled = false;
+          btn.innerText = "Login";
+        }
+      })
+      .checkLogin(user, pass);
+  }
+
+  function onVerifyOTP() {
+    const otp = document.getElementById('otpInput').value;
+    const btn = document.getElementById('verifyBtn');
+
+    if (!otp) return alert("Enter the code");
+
+    btn.disabled = true;
+    btn.innerText = "Verifying...";
+
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response.success) {
+          // SUCCESS! Display the name from Column E
+          alert("Success! Welcome " + response.name);
+          
+          // Update your main dashboard UI
+          document.getElementById('loginPage').classList.add('hidden');
+          // Assuming you have a div for username:
+          // document.getElementById('user-display').innerText = response.name;
+        } else {
+          alert(response.error || "Invalid OTP");
+          btn.disabled = false;
+          btn.innerText = "Verify & Login";
+        }
+      })
+      .verifyOTP(currentUsername, otp);
+  }
+</script>
+
+
+<!-- Main Wrapper -->
+<!-- Main Wrapper -->
+<div id="appPage" class="hidden flex min-h-screen bg-gray-100">
+  <!-- Inside your appPage div -->
+
+  <!-- Sidebar and Main Content here -->
+
+    
+    <!-- Sidebar -->
+    <aside class="w-64 bg-gray-800 text-white flex-shrink-0 flex flex-col">
+        <div class="p-6 text-xl font-bold border-b border-gray-700">Staff Dashboard</div>
+        
+        <nav class="mt-4 flex-1">
+            <!-- Sidebar Buttons -->
+            <button id="btn-staffSection" onclick="showSection('staffSection')" 
+                    class="sidebar-link w-full text-left py-3 px-6 hover:bg-gray-700 transition flex items-center gap-3">
+                <span>📝</span> Staff Form
+            </button>
+
+    
+<!-- The Sidebar Button (Keep as is) -->
+<button id="btn-updateSection" onclick="showSection('updateSection')" 
+        class="hidden sidebar-link w-full text-left py-3 px-6 hover:bg-gray-700 transition flex items-center gap-3">
+    <span>✏️</span> Update Staff Data
+</button>
+
+<!-- 1. Transfer (Existing) -->
+   <button id="btn-transferSection" onclick="showSection('transferSection')" 
+        class="hidden sidebar-link w-full text-left py-3 px-6 hover:bg-gray-700 transition flex items-center gap-3">
+    <span>🔄</span> Transfer / Renewal Staff
+</button>
+
+     
+            <button id="btn-recordsContainer" onclick="showSection('recordsContainer')" 
+                    class="sidebar-link w-full text-left py-3 px-6 hover:bg-gray-700 transition flex items-center gap-3">
+                <span>📊</span> View Records
+            </button>
+
+            <button id="btn-recordsContainer" onclick="printApplication()" 
+    class="sidebar-link w-full text-left py-3 px-6 hover:bg-gray-700 transition flex items-center gap-3">
+    <span>📊</span> Print Application
+</button>
+
+        <!-- Bottom Logout -->
+        <!-- <div class="p-4 border-t border-gray-700"> -->
+            <button onclick="logout()" class="w-full text-left py-2 px-4 text-red-400 hover:bg-gray-700 rounded transition">
+                Logout
+            </button>
+        <!-- </div> -->
+        </nav>
+
+    </aside>
+
+
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto">
+        <!-- Top Nav (Optional) -->
+        <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <h2 id="pageTitle" class="text-lg font-medium text-gray-700">Staff Form</h2>
+            <div class="text-sm text-gray-500">
+    Welcome back, <span class="font-bold text-blue-600">Loading...</span>
+</div>
+        </header>
+
+        <div class="p-8">
+            <!-- Staff Form Section
+            <div id="staffSection" class="content-section bg-white p-6 rounded shadow-lg">
+                <h3 class="text-lg font-semibold mb-4 border-b pb-2">Submit Staff Details</h3>
+                
+                
+                  <!-- Staff Form Section -->
+        <!-- The Update Section Container -->
+<div id="updateSection" class="content-section hidden bg-white p-6 rounded shadow-lg">
+    
+    <!-- This Search Area will now only appear when 'updateSection' is shown -->
+    <div id="updateSearchArea" class="bg-blue-50 p-4 mb-6 rounded-lg border border-blue-200 flex gap-4 items-end">
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-blue-700 uppercase mb-1">Search Staff by Unique ID</label>
+            <input type="text" id="updateIdSearch" placeholder="Enter Unique ID..." 
+                   class="p-2 border rounded w-64 outline-none focus:ring-2 focus:ring-blue-400 text-black">
+        </div>
+        <button type="button" id="fetchBtn" onclick="fetchStaffForUpdate()" 
+                class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">
+            Fetch Data
+        </button>
+    </div>
+
+   
+
+
+<!-- Ensure this hidden input exists inside your staffForm to store the ID for the final update -->
+<input type="hidden" id="field-id" name="id">
+
+                  <form id="staffForm" onsubmit="handleFormSubmit(this); return false;" >
+                     <!-- Here you can either include a copy of the staffForm or 
+         inform the user that the data below is loaded from the search -->
+    <div id="formContainerForUpdate">
+        <!-- The data fetched will populate the main staffForm fields -->
+        <p class="text-gray-500 italic">Enter an ID above to load staff details into the form.</p>
+    </div>
+</div>
+<div id="staffSection" class="content-section bg-white p-6 rounded shadow-lg">
+    <h3 class="text-lg font-semibold mb-4 border-b pb-2">Submit Staff Details</h3>
+    
+    <!-- Radio Toggle -->
+    <div class="mb-6 flex gap-6">
+   
+        <label class="flex items-center ml-2 text-sm font-bold text-red-600 custom-blink-effect">
+            <input type="radio" name="staffType" value="fresh" checked class="form-radio text-blue-600" onchange="toggleExistingFields(false)">
+            <span class="ml-2 font-medium">New Staff Apply here (Waiting for Approval)</span>
+
+        </label>
+        <label class="inline-flex items-center cursor-pointer">
+            <input type="radio" name="staffType" value="existing" class="form-radio text-blue-600" onchange="toggleExistingFields(true)">
+            <span class="ml-2 font-medium">Existing Staff (Approved Staff)</span>
+        </label>
+    </div>
+
+    <!-- Personal Details Section -->
+<div class="md:col-span-2 mt-4">
+    <h4 class="text-md font-semibold mb-3 text-gray-700 border-l-4 border-blue-500 pl-2">Personal Details</h4>
+    
+    <div id="staffForm" autocomplete="off" class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-5 border rounded-lg shadow-sm">
+        
+        <!-- Name (Full Width) -->
+       <!-- Name (Full Width) -->
+<div class="flex flex-col md:col-span-2">
+    <label class="text-xs font-bold text-gray-600 uppercase mb-1">
+        Full Name <span class="text-xs font-normal text-gray-400 lowercase italic">(name followed by initial without dots)</span>
+    </label>
+    <input type="text" 
+           autocomplete="off" 
+           id="name"
+           name="name" 
+           placeholder="e.g., ANANDKUMAR K" 
+           onclick="checkStaffTypeSelection(this)"
+           onfocus="checkStaffTypeSelection(this)"
+           oninput="validateNameFormat(this)"
+           class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none w-full bg-white" 
+           required>
+</div>
+
+
+        <!-- DOB & Age Row -->
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Date of Birth</label>
+            <input type="text" autocomplete="off" id="dob" name="dob" placeholder="Select Date" 
+                   onfocus="(this.type='date')" onblur="if(!this.value)this.type='text'"
+                   onchange="calculateAge()"
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none w-full" required>
+            <input type="text" 
+       id="ageDisplay" 
+       name="age" 
+       readonly 
+       onkeydown="return false;"
+       onpaste="return false;"
+       oncontextmenu="return false;"
+       class="w-full p-2 border rounded bg-gray-100 outline-none select-none pointer-events-none text-gray-700" 
+       tabindex="-1">
+
+        </div>
+
+        <!-- Designation -->
+<!-- Designation -->
+<div class="flex flex-col">
+    <label class="text-xs font-bold text-gray-600 uppercase mb-1">Designation</label>
+    <select name="designation" 
+            id="designation" 
+            onchange="resetTidFields()" 
+            autocomplete="off" 
+            class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none bg-white" required>
+        <option value="" disabled selected>Select Designation</option>
+        <option value="Principal">Principal</option>
+        <option value="Principal cum Professor">Principal cum Professor</option>
+        <option value="Associate Professor">Associate Professor</option>
+        <option value="Assistant Professor">Assistant Professor</option>
+        <option value="Physical Director">Physical Director</option>
+        <option value="Other Staff">Other Staff</option>
+    </select>
+</div>
+
+<!-- Subject of Teaching -->
+   <!-- Subject of Teaching -->
+<div class="flex flex-col lg:col-span-2">
+    <label class="text-xs font-bold text-gray-600 uppercase mb-1">Subject of Teaching</label>
+    <select  name="teaching_subject"> 
+            onchange="toggleOtherSubject(this)"
+            class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none bg-white w-full cursor-pointer" 
+            required>
+        <option value="" disabled selected hidden>Select Subject</option>
+        <option value="Pedagogy of Biological Science">Pedagogy of Biological Science</option>
+        
+        <option value="In Education">In Education</option>
+        <option value="Pedagogy of Physical Science">Pedagogy of Physical Science</option>
+        <option value="Pedagogy of Mathematics">Pedagogy of Mathematics</option>
+        <option value="Pedagogy of English">Pedagogy of English</option>
+        <option value="Pedagogy of Tamil">Pedagogy of Tamil</option>
+        <option value="Pedagogy of History">Pedagogy of History</option>
+        <option value="Pedagogy of Geography">Pedagogy of Geography</option>
+        <option value="Pedagogy of Commerce">Pedagogy of Commerce</option>
+        <option value="Pedagogy of Computer Science">Pedagogy of Computer Science</option>
+        <option value="Perspectives in Education">Perspectives in Education</option>
+        <option value="Fine Arts">Fine Arts</option>
+        <option value="Performing Arts">Performing Arts</option>
+    </select>
+    
+    <!-- Hidden input for "Other" -->
+    <input type="text" autocomplete="off" id="other_subject_input" name="other_teaching_subject" 
+           placeholder="Please specify your subject"
+           class="mt-2 p-2 border rounded border-blue-300 focus:ring-2 focus:ring-blue-400 outline-none w-full hidden">
+</div>
+        <!-- Course (Full Width or Half) -->
+        <div class="flex flex-col md:col-span-2">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Course</label>
+            <select name="course" autocomplete="off" class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none bg-white" required>
+                <option value="" disabled selected hidden>Choose Course</option>
+                <option value="B.Ed.">B.Ed.</option>
+                <option value="M.Ed.">M.Ed.</option>
+                <option value="B.Ed.& M.Ed.">B.Ed.& M.Ed.</option>
+                <option value="B.Sc.B.Ed.">B.Sc.B.Ed.</option>
+                <option value="BA.B.Ed.">BA.B.Ed.</option>
+            </select>
+        </div>
+
+        <!-- Aadhaar & PAN Row -->
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Aadhaar Number</label>
+            <input type="text" autocomplete="off" id="aadharInput" name="aadhar" placeholder="0000 0000 0000" maxlength="14" 
+                   oninput="formatAndValidateAadhar(this)" onblur="checkFinalLength(this)"
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none" required>
+            <p id="aadharError" class="text-red-500 text-[10px] hidden">Invalid Aadhaar Number</p>
+        </div>
+
+        <!-- <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">PAN Number</label>
+            <input type="text" id="panInput" name="pan" placeholder="ABCDE1234F" maxlength="10" 
+                   oninput="validatePAN(this)"
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none uppercase" required>
+            <p id="panError" class="text-red-500 text-[10px] hidden">Invalid PAN Format</p>
+        </div> -->
+
+        <!-- Community -->
+<div class="flex flex-col md:col-span-2">
+    <label class="text-xs font-bold text-gray-600 uppercase mb-1">Community</label>
+    <select id="community" autocomplete="off" name="community" class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none bg-white" required>
+        <option value="" disabled selected hidden>Select Community</option>
+        <option value="General">General</option>
+        <option value="OBC">OBC</option>
+        <option value="BC">BC</option>
+        <option value="MBC">MBC</option>
+        <option value="SC/ST">SC/ST</option>
+    </select>
+</div>
+
+        <!-- Mobile & Email Row -->
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Mobile Number</label>
+            <input type="text" autocomplete="off" id="mobileInput" name="mobile" placeholder="10-Digit Mobile" maxlength="10"
+                   oninput="validateMobile(this)"
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none" required>
+            <p id="mobileError" class="text-red-500 text-[10px] hidden">Starting with 6-9</p>
+        </div>
+
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Email ID</label>
+            <input type="email" autocomplete="off" name="email" placeholder="example@mail.com" 
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none" required>
+        </div>
+
+        <!-- Educational Qualifications -->
+<div class="md:col-span-2 mt-4">
+    <label class="text-xs font-bold text-gray-600 uppercase mb-2 block">Educational Qualifications</label>
+    <div class="overflow-x-auto">
+        <table class="w-full border-collapse border border-gray-200 text-sm">
+             <thead>
+    <tr class="bg-gray-100 text-[11px] uppercase text-gray-700">
+        <th class="border p-2 text-left w-32">Degree</th>
+        <th class="border p-2 text-left w-32 truncate" title="Subject">Subject</th>
+        <th class="border p-2 text-left w-24">% of Marks</th>
+        <th class="border p-2 text-left w-32">Class Secured</th>
+        <th class="border p-2 text-left w-32">Month & Year</th>
+        <th class="border p-2 text-left ">Board/University</th>
+    </tr>
+</thead>
+
+</thead>
+
+            <tbody id="qual-table-body">
+
+              <!-- Higher Secondary -->
+                <tr>
+                    <td class="border p-2 bg-gray-50 font-medium text-xs">HSC / 12th</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="hsc_subject" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Stream"></td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="hsc_marks" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="00.00%"></td>
+                    <!-- <td class="border p-1"><input type="text" name="hsc_class" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="1st/2nd"></td> -->
+                    <td class="border p-1">
+    <select name="hsc_class" autocomplete="off" class="w-full p-1 outline-none focus:bg-blue-50 bg-transparent cursor-pointer">
+        <option value="" disabled selected>Select Class</option>
+        <option value="first">First Class</option>
+        <option value="distinction">Distinction</option>
+        <option value="second">Second Class</option>
+    </select>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="hsc_date" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="MM/YYYY"></td> -->
+            <td class="border p-1">
+    <input type="month" 
+    autocomplete="off"
+           name="hsc_date" 
+           class="w-full p-1 outline-none focus:bg-blue-50 text-gray-700 cursor-pointer" 
+           required>
+</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="hsc_board" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="State Board/CBSE"></td>
+                </tr>
+              
+                <!-- Graduation -->
+                <tr>
+                    <td class="border p-2 bg-gray-50 font-medium text-xs">Graduation</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="ug_subject" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="e.g. B.Sc. Maths" required></td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="ug_marks" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="00.00%" required></td>
+                    <!-- <td class="border p-1"><input type="text" name="ug_class" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="1st/2nd" required></td> -->
+                      <td class="border p-1">
+                      <select name="ug_class" autocomplete="off" class="w-full p-1 outline-none focus:bg-blue-50 bg-transparent cursor-pointer">
+        <option value="" disabled selected>Select Class</option>
+        <option value="first">First Class</option>
+        <option value="distinction">Distinction</option>
+        <option value="second">Second Class</option>
+    </select>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="ug_date" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="MM/YYYY" required></td> -->
+<td class="border p-1">
+    <input type="month"
+    autocomplete="off" 
+           name="ug_date" 
+           class="w-full p-1 outline-none focus:bg-blue-50 text-gray-700 cursor-pointer" 
+           required>
+</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="ug_univ" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="University Name" required></td>
+                </tr>
+
+                  <!-- Post Graduation -->
+                <tr>
+                    <td class="border p-2 bg-gray-50 font-medium text-xs">Post Graduation</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="pg_subject" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="e.g. M.A. English"></td>
+                    <!-- <td class="border p-1"><input type="text" name="pg_marks" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="00.00%"></td> -->
+  <td class="border p-1">
+    <input type="number" autocomplete="off" step="0.01" name="pg_marks" 
+           oninput="validatePercentage(this)"
+           class="w-full p-1 outline-none focus:bg-blue-50" 
+           placeholder="00.00">
+    <p class="perc-error text-red-500 text-[9px] hidden">Min % not met</p>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="pg_class" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="1st/2nd"></td> -->
+          <td class="border p-1">
+         <select name="pg_class" autocomplete="off" class="w-full p-1 outline-none focus:bg-blue-50 bg-transparent cursor-pointer">
+        <option value="" disabled selected>Select Class</option>
+        <option value="first">First Class</option>
+        <option value="distinction">Distinction</option>
+        <option value="second">Second Class</option>
+        
+    </select>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="pg_date" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="MM/YYYY"></td> -->
+                                    <td class="border p-1">
+    <input type="month" 
+    autocomplete="off"
+           name="pg_date" 
+           class="w-full p-1 outline-none focus:bg-blue-50 text-gray-700 cursor-pointer" 
+           required>
+</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="pg_univ" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="University Name"></td>
+                </tr>
+
+                <!-- B.Ed / Professional -->
+                <tr>
+                    <td class="border p-2 bg-gray-50 font-medium text-xs">B.Ed.</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="prof_subject" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Specialization" required></td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="prof_marks" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="00.00%" required></td>
+                    <!-- <td class="border p-1"><input type="text" name="prof_class" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="1st/2nd" required></td> -->
+                    <td class="border p-1">
+                    <select name="prof_class" autocomplete="off" class="w-full p-1 outline-none focus:bg-blue-50 bg-transparent cursor-pointer">
+        <option value="" disabled selected>Select Class</option>
+        <option value="first">First Class</option>
+        <option value="distinction">Distinction</option>
+        <option value="second">Second Class</option>
+        
+    </select>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="prof_date" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="MM/YYYY" required></td> -->
+                    <td class="border p-1">
+    <input type="month" 
+    autocomplete="off"
+           name="prof_date" 
+           class="w-full p-1 outline-none focus:bg-blue-50 text-gray-700 cursor-pointer" 
+           required>
+</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="prof_univ" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Board/Univ" required></td>
+                </tr>
+
+                  <!-- M.Ed / Professional -->
+                <tr>
+                    <td class="border p-2 bg-gray-50 font-medium text-xs">M.Ed.</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="prof_subject1" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Specialization" required></td>
+                    <!-- <td class="border p-1"><input type="text" name="prof_marks1" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="00.00%" required></td> -->
+
+<td class="border p-1">
+    <input type="number" autocomplete="off" step="0.01" name="prof_marks1" 
+           oninput="validatePercentage(this)"
+           class="w-full p-1 outline-none focus:bg-blue-50" 
+           placeholder="00.00">
+    <p class="perc-error text-red-500 text-[9px] hidden">Min % not met</p>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="prof_class1" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="1st/2nd" required></td> -->
+          <td class="border p-1">
+         <select name="prof_class1" autocomplete="off" class="w-full p-1 outline-none focus:bg-blue-50 bg-transparent cursor-pointer">
+        <option value="" disabled selected>Select Class</option>
+        <option value="first">First Class</option>
+        <option value="distinction">Distinction</option>
+        <option value="second">Second Class</option>
+        
+    </select>
+</td>
+                    <!-- <td class="border p-1"><input type="text" name="prof_date1" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="MM/YYYY" required></td> -->
+                    <td class="border p-1">
+    <input type="month" 
+    autocomplete="off"
+           name="prof_date1" 
+           class="w-full p-1 outline-none focus:bg-blue-50 text-gray-700 cursor-pointer" 
+           required>
+</td>
+
+                    <td class="border p-1"><input type="text" autocomplete="off" name="prof_univ1" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Board/Univ" required></td>
+                </tr>
+                
+                <!-- NET/SLET/Ph.D -->
+                <tr>
+                    <td class="border p-2 bg-gray-50 font-medium text-xs">SET/NET/Ph.D</td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="other_subject" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Subject/Topic"></td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="other_marks" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="-"></td>
+                    <td class="border p-1"><input type="text" autocomplete="off" name="other_class" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Qualified" readonly></td>
+                    <td class="border p-1">
+    <input type="month" 
+    autocomplete="off"
+           name="other_date" 
+           class="w-full p-1 outline-none focus:bg-blue-50 text-gray-700 cursor-pointer" 
+           >
+</td>
+
+                    <td class="border p-1"><input type="text" autocomplete="off" name="other_body" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="UGC/CSIR/Univ"></td>
+                </tr>
+            </tbody>
+        </table>
+        <!-- Add Button -->
+<div class="mt-2">
+    <button type="button" onclick="addRow()" class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 transition">
+        + Add Qualification
+    </button>
+</div>
+    </div>
+</div>
+
+
+    </div>
+</div>
+
+<script>
+
+
+let staticRowCount = 6; // HSC, UG, PG, B.Ed, M.Ed, Ph.D
+const maxRows = 9; // Total limit: 6 static + 3 additional "Other"
+
+function addRow() {
+    const tbody = document.getElementById('qual-table-body');
+    const currentRows = tbody.getElementsByTagName('tr').length;
+    
+    // Allow addition if current rows are less than 9
+    if (currentRows >= maxRows) {
+        alert("Maximum of 3 additional qualifications reached.");
+        return;
+    }
+
+    const nextIndex = currentRows + 1; // This will start at 7
+    const otherNumber = nextIndex - staticRowCount; // Label: Other 1, Other 2...
+    
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+        <td class="border p-2 bg-gray-50 font-medium text-xs">Other ${otherNumber}</td>
+        <td class="border p-1"><input type="text" name="prof_subject${nextIndex}" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Subject"></td>
+        <td class="border p-1"><input type="number" step="0.01" name="prof_marks${nextIndex}" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="00.00"></td>
+        <td class="border p-1">
+            <select name="prof_class${nextIndex}" class="w-full p-1 outline-none focus:bg-blue-50">
+                <option value="">Select Class</option>
+                <option value="first">First Class</option>
+                <option value="distinction">Distinction</option>
+                <option value="second">Second Class</option>
+            </select>
+        </td>
+        <td class="border p-1"><input type="month" name="prof_date${nextIndex}" class="w-full p-1 outline-none focus:bg-blue-50"></td>
+        <td class="border p-1"><input type="text" name="prof_univ${nextIndex}" class="w-full p-1 outline-none focus:bg-blue-50" placeholder="Board/Univ"></td>
+        <td class="border p-1 text-center">
+            <button type="button" onclick="this.closest('tr').remove()" class="text-red-500 font-bold">×</button>
+        </td>
+    `;
+    tbody.appendChild(newRow);
+}
+
+
+
+function removeQualRow(btn) {
+    btn.closest('tr').remove();
+    rowCount--; // Allow user to add another row again if one is deleted
+}
+
+function checkStaffTypeSelection(inputField) {
+    // Look for whichever radio button is currently checked
+    const selectedStaffType = document.querySelector('input[name="staffType"]:checked');
+    
+    // If no radio option has been selected yet
+    if (!selectedStaffType) {
+        alert('⚠️ Access Denied: Please select either "New Staff" or "Existing Staff " before entering your name.');
+        
+        inputField.blur(); // Forces the keyboard/cursor focus out of the input box instantly
+        
+        // Find the first radio button option and scroll up to highlight it visually
+        const firstRadio = document.querySelector('input[name="staffType"]');
+        if (firstRadio) firstRadio.focus();
+    }
+}
+
+
+function validatePercentage(input) {
+    const community = document.getElementById('community').value;
+    const errorMsg = input.parentNode.querySelector('.perc-error');
+    const percentage = parseFloat(input.value);
+
+    if (!community) {
+        errorMsg.classList.add('hidden');
+        return;
+    }
+
+    const minRequired = (community === "SC/ST") ? 50 : 55;
+
+    if (!isNaN(percentage) && percentage < minRequired) {
+        errorMsg.textContent = `Min ${minRequired}% required`;
+        errorMsg.classList.remove('hidden');
+        input.classList.add('border-red-500', 'bg-red-50');
+    } else {
+        errorMsg.classList.add('hidden');
+        input.classList.remove('border-red-500', 'bg-red-50');
+    }
+
+    // New: Check all errors to toggle submit button
+    toggleSubmitButton();
+}
+
+function toggleSubmitButton() {
+    const submitBtn = document.getElementById('submitBtn');
+    // Check if any error message is currently visible
+    const hasErrors = Array.from(document.querySelectorAll('.perc-error'))
+                           .some(error => !error.classList.contains('hidden'));
+    
+    submitBtn.disabled = hasErrors;
+}
+
+// Re-validate when community changes
+document.getElementById('community').addEventListener('change', function() {
+    document.querySelectorAll('input[name*="marks"]').forEach(input => {
+        validatePercentage(input);
+    });
+});
+
+
+
+function calculateAge() {
+    const dobValue = document.getElementById('dob').value;
+    if (!dobValue) return;
+
+    const dob = new Date(dobValue);
+    const today = new Date();
+
+    let years = today.getFullYear() - dob.getFullYear();
+    let months = today.getMonth() - dob.getMonth();
+    let days = today.getDate() - dob.getDate();
+
+    if (days < 0) {
+        months--;
+        const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        days += lastMonth.getDate();
+    }
+
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    // This puts the result into the textbox so it can be saved
+    const resultString = `${years}Y ${months}M ${days}D`;
+    document.getElementById('ageDisplay').value = resultString;
+}
+</script>
+
+<script>
+// Verhoeff tables
+const d = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+const p = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+
+function validateVerhoeff(array) {
+    let c = 0;
+    let invertedArray = array.split('').map(Number).reverse();
+    for (let i = 0; i < invertedArray.length; i++) {
+        c = d[c][p[i % 8][invertedArray[i]]];
+    }
+    return (c === 0);
+}
+function checkFinalLength(el) {
+    let rawValue = el.value.replace(/\D/g, ''); // Remove spaces
+    
+    // If the field isn't empty but isn't 12 digits
+    if (rawValue.length > 0 && rawValue.length < 12) {
+        alert("⚠️ Please enter a complete 12-digit Aadhaar number.");
+        el.style.borderColor = "#EF4444"; // Red
+        setTimeout(() => el.focus(), 10); // Optional: force user back to fix it
+    }
+}
+
+function formatAndValidateAadhar(el) {
+    let rawValue = el.value.replace(/\D/g, '');
+    
+    // Formatting logic
+    let parts = rawValue.match(/.{1,4}/g);
+    el.value = parts ? parts.join(' ').substring(0, 14) : '';
+
+    const errorMsg = document.getElementById('aadharError');
+
+    // 1. If exactly 12 digits, run the Verhoeff Checksum
+    if (rawValue.length === 12) {
+        if (validateVerhoeff(rawValue)) {
+            errorMsg.classList.add('hidden');
+            el.style.borderColor = "#10B981"; // Green
+        } else {
+            errorMsg.classList.remove('hidden');
+            el.style.borderColor = "#EF4444"; // Red
+            alert("⚠️ Invalid Aadhaar Number! The digits do not match the official format.");
+            el.value = ""; 
+        }
+    } else {
+        // Just reset colors while typing
+        errorMsg.classList.add('hidden');
+        el.style.borderColor = "#D1D5DB"; 
+    }
+}
+
+
+
+function handleFormSubmit(formObject) {
+    const aadharValue = document.getElementById('aadharInput').value.replace(/\s/g, '');
+    
+    // Final check before sending to Google Sheets
+    if (aadharValue.length !== 12) {
+        alert("Please enter a valid 12-digit Aadhaar number.");
+        return;
+    }
+
+    // Now it is safe to run the server script
+    google.script.run
+        .withSuccessHandler(onSuccess)
+        .submitStaffData(formObject, userEmail);
+}
+</script>
+
+
+
+
+
+<script>
+function validatePAN(el) {
+    el.value = el.value.toUpperCase();
+    
+    // Pattern: 5 letters, 4 digits, 1 letter
+    const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    const errorMsg = document.getElementById('panError');
+
+    if (el.value.length === 10) {
+        const isPatternValid = panPattern.test(el.value);
+        const isIndividual = el.value[3] === 'P'; // 4th character must be 'P'
+
+        if (isPatternValid && isIndividual) {
+            errorMsg.classList.add('hidden');
+            el.classList.replace('border-red-500', 'border-gray-300');
+            el.classList.add('border-green-500');
+        } else {
+            // Specific error message for non-individual PANs
+            errorMsg.innerText = !isIndividual && isPatternValid 
+                ? "Invalid: 4th character must be 'P' for Individual/Staff." 
+                : "Invalid PAN Format (Example: ABCDE1234F)";
+            
+            errorMsg.classList.remove('hidden');
+            el.classList.replace('border-green-500', 'border-red-500');
+        }
+    } else {
+        errorMsg.classList.add('hidden');
+        el.classList.remove('border-red-500', 'border-green-500');
+    }
+}
+
+ 
+</script>
+
+<!-- Conditional Fields (Hidden by default) -->
+        <div id="existingFields" class="hidden md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-md mb-2">
+
+           <div class="flex flex-col">
+                <label class="text-sm font-semibold">Date of Approval</label>
+                <input type="date" autocomplete="off" name="approvalDate" class="p-2 border rounded">
+            </div>
+
+            <div class="flex flex-col">
+    <label class="text-sm font-semibold text-gray-700 mb-1">
+        University Approval Letter Ref. No. </label>
+    <input type="text" 
+           id="joiningDate"
+           name="joiningDate" 
+           placeholder="e.g., UNI/2026/XYZ-123"
+           autocomplete="off"
+           class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none w-full bg-white">
+</div>
+
+        </div>
+
+        
+<script>
+
+function toggleExistingFields(isExisting) {
+    const staffForm = document.getElementById('staffForm');
+    const staffSection = document.getElementById('staffSection');
+    const feesContainer = document.getElementById('feesContainer');
+    const updateInput = document.getElementById('updateIdSearch');
+
+    // Always show the form
+    if (staffSection) staffSection.classList.remove('hidden');
+
+    if (staffForm) {
+        // --- CLEAR PHOTO PREVIEW ---
+        const photoFile = document.getElementById('photoFile');
+        const photoPreviewContainer = document.getElementById('photoPreviewContainer');
+        const sizeError = document.getElementById('sizeError');
+        const photoPreview = document.getElementById('photoPreview');
+
+        if (photoFile) photoFile.value = "";
+        if (sizeError) sizeError.classList.add('hidden');
+        if (photoPreviewContainer) photoPreviewContainer.classList.add('hidden');
+        if (photoPreview) photoPreview.src = "#";
+
+        Array.from(staffForm.elements).forEach(el => {
+            if (el.name !== 'staffType') {
+                if (['text', 'date', 'number', 'email', 'textarea', 'select-one'].includes(el.type)) {
+                    el.value = '';
+                }
+                if (el.type === 'radio' || el.type === 'checkbox') {
+                    el.checked = false;
+                }
+                
+                el.disabled = false;
+                el.readOnly = false;
+                el.style.pointerEvents = "auto";
+                el.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            } else {
+                el.disabled = false;
+                el.style.pointerEvents = "auto";
+            }
+        });
+
+        const hiddenId = document.getElementById('field-id');
+        if (hiddenId) hiddenId.value = ""; 
+    }
+
+    // 2. MODE-SPECIFIC UI
+    if (isExisting) {
+        if (feesContainer) feesContainer.classList.add('hidden');
+        if (updateInput) {
+            updateInput.disabled = false;
+            updateInput.value = '';
+        }
+    } else {
+        if (feesContainer) feesContainer.classList.remove('hidden');
+        if (updateInput) updateInput.disabled = true;
+    }
+
+    // 3. TOGGLE JOINING/APPROVAL DATES (Now inside the function)
+    const existingFields = document.getElementById('existingFields');
+    if (existingFields) {
+        if (isExisting) {
+            existingFields.classList.remove('hidden'); 
+        } else {
+            existingFields.classList.add('hidden');    
+        }
+    }
+
+    if (typeof resetExperienceRows === 'function') resetExperienceRows();
+} // <--- Function now ends here
+
+
+
+
+
+
+</script>
+
+<!-- Recruitment & Service Dates Section -->
+
+<!-- Recruitment & Service Dates Section -->
+<div class="mt-8">
+    <h3 class="text-sm font-bold text-blue-800 uppercase mb-4 border-b pb-2">Recruitment & Service Details</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        
+        <!-- Date of Entry into Collegiate Service -->
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Entry into Collegiate Service</label>
+            <input type="date" name="collegiate_entry_date" 
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none w-full" required>
+        </div>
+
+        <!-- Date of Joining Present Institution -->
+        <div class="flex flex-col">
+            <label class="text-xs font-bold text-gray-600 uppercase mb-1">Date of Joining Present College</label>
+            <input type="date" name="present_joining_date" 
+                   class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none w-full" required>
+        </div>
+
+    </div>
+</div>
+
+
+
+<script>
+function validateMobile(input) {
+    // 1. Remove non-numeric characters immediately
+    input.value = input.value.replace(/[^0-9]/g, '');
+
+    const errorMsg = document.getElementById('mobileError');
+    const pattern = /^[6-9][0-9]{9}$/;
+
+    // 2. Show error if user has typed 10 digits but they are invalid
+    if (input.value.length === 10) {
+        if (!pattern.test(input.value)) {
+            errorMsg.classList.remove('hidden');
+            input.classList.add('border-red-500');
+        } else {
+            errorMsg.classList.add('hidden');
+            input.classList.remove('border-red-500');
+            input.classList.add('border-green-500');
+        }
+    } else {
+        // Hide error while user is still typing (less than 10 digits)
+        errorMsg.classList.add('hidden');
+        input.classList.remove('border-red-500', 'border-green-500');
+    }
+}
+
+function toggleOtherSubject(selectElement) {
+    const otherInput = document.getElementById('other_subject_input');
+    if (selectElement.value === 'Other') {
+        otherInput.classList.remove('hidden');
+        otherInput.setAttribute('required', 'required');
+        otherInput.focus();
+    } else {
+        otherInput.classList.add('hidden');
+        otherInput.removeAttribute('required');
+        otherInput.value = ''; // Clear the input if user switches back
+    }
+}
+
+</script>
+                    <div class="col-span-2">
+    <label class="block text-sm font-medium text-gray-700 mb-1">Staff Photo (Max 20KB)</label>
+    <input type="file" id="photoFile" accept="image/*" class="p-2 border rounded w-full">
+    
+    <!-- Error message for file size -->
+    <p id="sizeError" class="text-red-500 text-xs mt-1 hidden">File too large! Max 20KB allowed.</p>
+    
+    <!-- Photo Preview Container -->
+    <div id="photoPreviewContainer" class="mt-3 hidden">
+        <p class="text-xs font-bold text-gray-600 mb-1">Photo Preview:</p>
+        <img id="photoPreview" src="#" alt="Staff Photo Preview" class="w-24 h-24 object-cover border rounded shadow-sm">
+    </div>
+</div>
+
+
+<!-- Work Experience Section -->
+<div class="col-span-2 mt-6 border-t pt-4">
+    <h3 class="text-sm font-bold text-gray-700 mb-3">Work Experience</h3>
+    <!-- Labels Header -->
+    <div class="grid grid-cols-5 gap-2 px-2 mb-1">
+        <label class="text-[10px] font-semibold text-gray-600 uppercase">College Code</label>
+        <label class="text-[10px] font-semibold text-gray-600 uppercase">College Name</label>
+        <label class="text-[10px] font-semibold text-gray-600 uppercase">Designation</label>
+        <label class="text-[10px] font-semibold text-gray-600 uppercase">From Date</label>
+        <label class="text-[10px] font-semibold text-gray-600 uppercase">To Date</label>
+    </div>
+    <div id="experienceContainer" class="space-y-2">
+        <!-- Template Row -->
+        <div class="experience-row grid grid-cols-5 gap-2 p-2 bg-gray-50 rounded border">
+            <input type="text" name="collegeCode[]" autocomplete="off"placeholder="Code" class="p-2 border rounded text-xs">
+            <input type="text" name="collegeName[]" autocomplete="off"placeholder="College Name" class="p-2 border rounded text-xs">
+            <input type="text" name="designation[]" autocomplete="off"placeholder="Designation" class="p-2 border rounded text-xs">
+            <input type="date" name="fromDate[]" autocomplete="off" class="p-2 border rounded text-xs" title="From Date">
+            <div class="flex gap-1">
+                <input type="date" name="toDate[]" autocomplete="off" class="p-2 border rounded text-xs w-full" title="To Date">
+                <button type="button" onclick="removeRow(this)" class="text-red-500 font-bold px-2 hover:bg-red-100 rounded">×</button>
+            </div>
+        </div>
+    </div>
+    <button type="button" onclick="addExperienceRow()" class="mt-3 bg-blue-50 text-blue-600 border border-blue-200 px-4 py-1 rounded text-xs font-medium hover:bg-blue-100">
+        + Add Another Experience
+    </button>
+</div>
+
+
+                                        <!-- Fees Paid Dropdown -->
+<!-- Fees Paid Dropdown -->
+<div id="feesContainer" class="col-span-2">
+    <label class="block text-sm font-medium text-gray-700 mb-1">Fees Paid Details</label>
+    <select id="feesStatus" name="fstatus" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none" onchange="toggleFeesInfo()">
+        <option value="" disabled selected>Fees Paid?</option>
+        <option value="yes">Yes</option>
+    </select>
+    </select>
+
+    <!-- Hidden Payment Details -->
+<!-- Hidden Payment Details -->
+<div id="paymentDetails" style="display: none;" class="flex flex-col gap-2 mt-3">
+    <label class="text-xs font-bold text-gray-600">Transaction ID & Staff Count</label>
+    <input type="text" 
+           autocomplete="off"
+           name="transaction_id" 
+           id="tid" 
+           value="IP"
+           placeholder="Enter Transaction ID" 
+           onfocus="ensurePrefix(this)"
+           oninput="lockPrefix(this)"
+           onblur="handleTidEntry()" 
+           class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none w-full bg-white">
+    
+    <!-- Hidden field to store how many people this ID covers -->
+    <input type="hidden" autocomplete="off" name="tid_limit" id="tid_limit" value="1">
+    
+    <div class="flex flex-col">
+        <label class="text-[10px] text-gray-500 font-semibold uppercase">Fee per Staff (Auto-calculated)</label>
+        <input type="number" 
+               readonly
+               name="amount" 
+               id="amt" 
+               placeholder="Amount Paid" 
+               class="p-2 border rounded bg-gray-100 font-bold text-blue-700 outline-none">
+    </div>
+        
+    <input type="text" 
+           autocomplete="off" 
+           name="pdate" 
+           id="pdate" 
+           placeholder="Transaction Date" 
+           onfocus="(this.type='date')" 
+           onblur="if(!this.value)this.type='text'"
+           class="p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none">
+</div>
+</div>
+
+<script>
+
+
+  let usageLimit = 1; // Default
+
+function toggleFeesInfo() {
+    const status = document.getElementById('feesStatus').value;
+    const container = document.getElementById('paymentDetails');
+    const tid = document.getElementById('tid');
+    const amt = document.getElementById('amt');
+    const pdate = document.getElementById('pdate');
+
+    // If elements don't exist yet in DOM, exit safely
+    if (!container || !tid || !amt || !pdate) return;
+
+    if (status === 'yes') {
+        container.style.display = 'flex';
+        tid.required = true;
+        amt.required = true;
+        pdate.required = true;
+    } else {
+        container.style.display = 'none';
+        tid.required = false;
+        amt.required = false;
+        pdate.required = false;
+        tid.value = ""; 
+        amt.value = ""; 
+        pdate.value = "";
+    }
+}
+
+// Run on page load to initialize validation constraints correctly
+document.addEventListener("DOMContentLoaded", toggleFeesInfo);
+
+
+  // New function: Triggered when Transaction ID is entered
+function handleTidEntry() {
+    const tidInput = document.getElementById('tid');
+    const limitInput = document.getElementById('tid_limit');
+    const amtInput = document.getElementById('amt');
+    const pdateInput = document.getElementById('pdate');
+    const designationField = document.getElementById('designation');
+    
+    if (!tidInput) return;
+
+    // 1. FIX: Enforce "IP" Prefix Guard Clause on Blur Event
+    let rawValue = tidInput.value.trim();
+    
+    // If empty or just white space, restore it to standard default "IP"
+    if (rawValue === "" || rawValue === "IP") {
+        tidInput.value = "IP";
+        if (amtInput) amtInput.value = "";
+        return; 
+    }
+
+    // Force values to uppercase and prepend "IP" if missing completely
+    if (!rawValue.startsWith("IP")) {
+        rawValue = "IP" + rawValue.replace(/^I?P?/gi, "");
+    }
+    tidInput.value = rawValue.toUpperCase(); // Uniformity across spreadsheet entries
+
+    // 2. Original Logic: Enforce Designation Pre-selection Check
+    const currentDesignation = designationField ? designationField.value : "";
+    if (!currentDesignation || currentDesignation === "" || currentDesignation.toLowerCase().includes("select")) {
+        alert("⚠️ Please select a Designation first.");
+        tidInput.value = "IP"; // Reverts to placeholder state safely
+        if (amtInput) amtInput.value = "";
+        return;
+    }
+
+    const tid = tidInput.value.trim();
+
+    const currentIsPrincipal = (currentDesignation.trim() === "Principal");
+    const perHeadFee = currentIsPrincipal ? 1500 : 1000;
+    if (amtInput) amtInput.value = perHeadFee;
+
+    // 3. Server-Side Handshake Call Pipeline
+    google.script.run.withSuccessHandler(function(info) {
+        if (info.savedLimit) {
+            // Check category mismatch (Principal IDs vs Staff IDs)
+            const savedIsPrincipal = info.savedDesignation.includes("Principal");
+            
+            if (currentIsPrincipal !== savedIsPrincipal) {
+                const category = savedIsPrincipal ? "Principals (₹1500)" : "Other Staff (₹1000)";
+                alert(`❌ Access Denied: This Transaction ID belongs to ${category}.`);
+                tidInput.value = "IP";
+                if (amtInput) amtInput.value = "";
+                return;
+            }
+
+            let totalAllowed = parseInt(info.savedLimit);
+            if (info.savedDate && pdateInput) {
+                pdateInput.value = info.savedDate;
+                pdateInput.type = 'date';
+                pdateInput.readOnly = true;
+                pdateInput.classList.add('bg-gray-100');
+            }
+            
+            const remaining = totalAllowed - info.existingCount;
+            if (remaining <= 0) {
+                alert("❌ This Transaction ID is fully used.");
+                tidInput.value = "IP";
+                if (amtInput) amtInput.value = "";
+            } else {
+                alert(`✅ Verified. ${remaining} slot(s) remaining.`);
+                if (limitInput) limitInput.value = totalAllowed;
+            }
+
+        } else {
+            // NEW LOGIC: Conditional Prompting
+            let totalAllowed;
+
+            if (currentIsPrincipal) {
+                // Principals are locked to 1
+                totalAllowed = 1;
+                alert(`Verified: Fee for Principal is ₹${perHeadFee}.`);
+            } else {
+                // Others can set a limit
+                const userPrompt = prompt("Please Enter No.of staff covered in this Transanction ID?", "1");
+                totalAllowed = parseInt(userPrompt) || 1;
+                
+                const expectedTotal = perHeadFee * totalAllowed;
+                const confirmTotal = prompt(`Total paid for ${totalAllowed} staff must be ₹${expectedTotal}. Enter total paid to verify:`, "0");
+
+                if (parseInt(confirmTotal) !== expectedTotal) {
+                    alert("❌ Validation Failed. Amount does not match staff count.");
+                    tidInput.value = "IP";
+                    if (amtInput) amtInput.value = "";
+                    return;
+                }
+            }
+            
+            if (limitInput) limitInput.value = totalAllowed;
+            if (pdateInput) pdateInput.readOnly = false;
+        }
+    }).getTidInfo(tid);
+}
+
+
+</script>
+
+<div class="col-span-2 flex items-start gap-3 bg-blue-50 p-4 rounded border border-blue-100 mb-4">
+    <input type="checkbox" id="declaration" name="declaration" 
+           onchange="toggleSubmitButton()"
+           class="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer" required>
+    <label for="declaration" class="text-sm text-gray-700 leading-relaxed cursor-pointer">
+        <strong>Declaration 1:</strong> The above particulars furnished by me are true to the best of my knowledge and belief. I understand that any false information may lead to rejection.The Correct particulars are to be furnished by the incumbent for assessing his eligibilty to hold the posts concerned. Incorrect particulars if any, furnished will be viewed seriously and penal actions will be initiated.
+
+    </label>
+</div>
+                   <!-- Centering Wrapper -->
+    <div class="col-span-1 md:col-span-2 flex justify-center mt-6">
+        <button type="submit" 
+                id="submitBtn"
+                class="w-full md:w-64 bg-green-600 text-white p-3 rounded-lg font-bold hover:bg-green-700 transition shadow-lg active:transform active:scale-95">
+            Submit Details
+        </button>
+    </div>
+                </form>
+            </div>
+
+<!-- Main Form Section -->
+<div id="transferSection" class="content-section hidden p-6">
+  <!-- Transfer Form Section -->
+<!-- Selection Phase -->
+<div class="p-6 bg-gray-50 border-b">
+    <label class="block text-sm font-bold text-gray-700 mb-3">Select Mode of Application:</label>
+    <div class="flex gap-4 mb-4">
+        <label class="flex items-center gap-2 p-3 bg-white rounded shadow-sm border cursor-pointer hover:border-blue-500 transition">
+            <input type="radio" name="applyMode" value="transfer" onclick="handleModeSwitch('transfer')">
+            <span class="text-sm font-medium">1. Apply through transfer from other college</span>
+        </label>
+        
+        <label class="flex items-center gap-2 p-3 bg-white rounded shadow-sm border cursor-pointer hover:border-blue-500 transition">
+            <input type="radio" name="applyMode" value="renewal" onclick="handleModeSwitch('renewal')">
+            <span class="text-sm font-medium">2. Renewal</span>
+        </label>
+    </div>
+</div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+        <h2 id="form-title" class="text-xl font-bold mb-4">Transfer Staff Request</h2>
+        
+        <!-- Search -->
+        <div class="flex gap-2 mb-6">
+            <input type="text" id="search-id" placeholder="Enter Unique ID..." class="border p-2 rounded w-full">
+            <button onclick="fetchStaffData()" class="bg-blue-600 text-white px-4 py-2 rounded">Search</button>
+        </div>
+
+        <form id="staff-transfer-form" class="space-y-4">
+            <!-- Basic Fields -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" id="field-id" placeholder="ID" readonly class="p-2 bg-gray-100 border">
+                <input type="text" id="field-name" placeholder="Name" readonly class="p-2 bg-gray-100 border">
+                <input type="date" id="field-dob" readonly class="p-2 bg-gray-100 border">
+                <input type="text" id="field-aadhar" placeholder="Aadhar" readonly class="p-2 bg-gray-100 border">
+                <input type="email" id="field-email" placeholder="Email" readonly class="p-2 bg-gray-100 border col-span-2">
+            </div>
+
+            <!-- Date of Relieving (Hidden in Renewal Mode) -->
+            <div id="relieving-section" class="mt-4 p-3 bg-red-50 rounded border border-red-100">
+                <label class="block text-xs font-bold text-red-700 mb-1">Date of Relieved (Previous College)</label>
+                <input type="date" id="field-relieved-date" class="p-2 border rounded w-full md:w-1/2" required>
+            </div>
+
+            <!-- Experience History -->
+            <div class="mt-6 border-t pt-4">
+                <h3 class="text-sm font-bold text-gray-700 mb-2">Previous Records Found</h3>
+                <div class="grid grid-cols-5 gap-2 px-2 mb-1">
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">College Code</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">College Name</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">Designation</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">From Date</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">To Date</label>
+                </div>
+                <div id="fetchedExperienceContainer" class="space-y-1 mb-4 text-gray-600"></div>
+
+                <div class="flex justify-between items-center mb-2">
+                    <h3 id="exp-title" class="text-sm font-bold text-blue-700">Enter Current Experience</h3>
+                </div>
+                <div class="grid grid-cols-5 gap-2 px-2 mb-1">
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">College Code</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">College Name</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">Designation</label>
+                    <label id="date-label" class="text-[10px] font-semibold text-gray-600 uppercase">Date of Joined in Current College</label>
+                    <label class="text-[10px] font-semibold text-gray-600 uppercase">Till Date</label>
+                </div>
+                <div id="experienceContainer" class="space-y-2">
+                    <div class="experience-row grid grid-cols-5 gap-2 p-2 bg-blue-50 rounded border border-blue-200">
+                        <input type="text" name="collegeCode[]" autocomplete="off" placeholder="Code" class="p-2 border rounded text-xs" required>
+                        <input type="text" name="collegeName[]" autocomplete="off" placeholder="College Name" class="p-2 border rounded text-xs" required>
+                        <input type="text" name="designation[]" autocomplete="off" placeholder="Designation" class="p-2 border rounded text-xs">
+                        <input type="date" name="fromDate[]" autocomplete="off" class="p-2 border rounded text-xs" required>
+                        <input type="date" id="toDate" name="toDate[]" value="<?= new Date().toISOString().split('T')[0] ?>" readonly required>
+                    </div>
+                </div>
+            </div>
+<!-- Transaction Details -->
+<div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div>
+        <label class="block text-sm font-medium">Transaction ID</label>
+        <input type="text" id="field-trans-id" autocomplete="off" class="w-full border rounded p-2" required>
+    </div>
+    <div>
+        <label class="block text-sm font-medium">Amount</label>
+        <input type="number" id="field-trans-amount" autocomplete="off" class="w-full border rounded p-2" required>
+    </div>
+    <div>
+        <label class="block text-sm font-medium">Transaction Date</label>
+        <input type="date" id="field-trans-date" autocomplete="off" class="w-full border rounded p-2" required>
+    </div>
+</div>
+
+            <div class="mt-4 flex items-center gap-2">
+                <input type="checkbox" id="apply-check" onclick="toggleSubmit()">
+                <label for="apply-check" id="checkbox-label" class="text-red-600 font-bold">Apply for Transfer Request</label>
+            </div>
+
+            <button type="submit" id="submit-transfer" disabled class="w-full bg-green-600 text-white py-2 rounded opacity-50 cursor-not-allowed">
+                Submit Transfer
+            </button>
+        </form>
+    </div>
+</div>
+
+
+
+            <!-- Records Section -->
+            <div id="recordsContainer" class="content-section hidden">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h3 class="text-xl font-bold text-gray-800">Staff Records</h3>
+        
+        <div class="flex items-center gap-2">
+            <!-- Search -->
+            <!-- <input type="text" id="searchInput" onkeyup="filterTable()" 
+                   placeholder="Search..." 
+                   class="p-2 border rounded shadow-sm focus:ring-2 focus:ring-blue-500 outline-none w-48"> -->
+            
+            <!-- Export Buttons -->
+            <!-- <button onclick="downloadCSV()" class="bg-blue-50 text-blue-600 px-4 py-2 rounded font-medium hover:bg-blue-600 hover:text-white transition">
+                📥 CSV
+            </button> -->
+            <!-- <button onclick="downloadPDF()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+    Download PDF
+</button> -->
+
+
+
+            <button onclick="window.print()" class="bg-gray-100 text-gray-700 px-4 py-2 rounded font-medium hover:bg-gray-800 hover:text-white transition">
+                🖨️ Print
+            </button>
+                    </div>
+                </div>
+                <!-- Scrollable Wrapper -->
+<div class="bg-white rounded shadow overflow-x-auto">
+    <table id="recordsTable" class="w-full text-left border-collapse min-w-[1500px]"> <!-- Added min-width to prevent squishing -->
+        <thead class="bg-gray-200 text-gray-700 uppercase text-[10px]">
+            <tr>
+                <th class="p-2 border">Sno</th>
+                <th class="p-2 border">College Code</th>
+                <th class="p-2 border">Staff id</th>
+                <th class="p-2 border">Name</th>
+                <th class="p-2 border">Designation</th>
+                <th class="p-2 border">DOB</th>
+                <th class="p-2 border">Community</th>
+                <th class="p-2 border">Course</th>
+                <th class="p-2 border">Aadhar</th>
+                <!-- <th class="p-2 border">staffType</th>
+                <th class="p-2 border">DOJ</th> -->
+                <!-- <th class="p-2 border">Exp</th>
+                <th class="p-2 border">Applied</th> -->
+                <th class="p-2 border">Mobile</th>
+                <th class="p-2 border">Email</th>
+                <th class="p-2 border">Photo</th>
+                <!-- <th class="p-2 border">Fees Paid Details</th> Concatenated Header -->
+                <th class="p-2 border">Status</th>
+                <th class="p-2 border">Action</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y divide-gray-100 text-xs">
+            <!-- Data injected here -->
+        </tbody>
+    </table>
+</div>
+
+</div>
+
+
+
+<script>
+  
+function showSection(sectionId) {
+    // 1. Hide all sections
+    document.querySelectorAll('.content-section').forEach(sec => sec.classList.add('hidden'));
+
+    const staffForm = document.getElementById('staffForm');
+    const staffSection = document.getElementById('staffSection');
+    const updateInput = document.getElementById('updateIdSearch');
+    const fetchBtn = document.getElementById('fetchBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const feesContainer = document.getElementById('feesContainer');
+
+    // --- ENHANCED RESET LOGIC ---
+    if (staffForm) {
+        staffForm.reset(); 
+
+ // --- ADDED: CLEAR PHOTO UI ---
+        const photoPreviewContainer = document.getElementById('photoPreviewContainer');
+        const sizeError = document.getElementById('sizeError');
+        const photoPreview = document.getElementById('photoPreview');
+        
+        if (photoPreviewContainer) photoPreviewContainer.classList.add('hidden');
+        if (sizeError) sizeError.classList.add('hidden');
+        if (photoPreview) photoPreview.src = "#";
+
+        
+        Array.from(staffForm.elements).forEach(el => {
+            // Manually wipe values to ensure nothing remains from a previous fetch
+            if (['text', 'date', 'number', 'email', 'textarea', 'select-one'].includes(el.type)) {
+                el.value = '';
+            }
+            if (el.type === 'radio' || el.type === 'checkbox') {
+                el.checked = false;
+            }
+            
+            // Unlock and remove styling
+            el.disabled = false;
+            el.readOnly = false;
+            el.style.pointerEvents = "auto";
+            el.classList.remove('bg-gray-100', 'cursor-not-allowed');
+        });
+
+        // Manually clear the hidden primary key field
+        const hiddenId = document.getElementById('field-id');
+        if (hiddenId) hiddenId.value = "";
+    }
+    
+    // Force the staff data container to hide immediately on any section switch
+    if (staffSection) staffSection.classList.add('hidden');
+    if (typeof resetExperienceRows === 'function') resetExperienceRows();
+
+    // 2. Handle Logic for "Update Staff Data" (Existing Button)
+    if (sectionId === 'updateSection') {
+        document.getElementById('updateSection').classList.remove('hidden');
+        
+        if (submitBtn) {
+            submitBtn.classList.add('hidden');
+            submitBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            submitBtn.classList.add('bg-orange-600', 'hover:bg-orange-700');
+        }
+
+        if (staffForm) {
+            // Keep fields disabled until a successful search fetch
+            Array.from(staffForm.elements).forEach(el => el.disabled = true);
+        }
+        
+        if (updateInput) {
+            updateInput.disabled = false;
+            updateInput.value = ''; 
+        }
+        if (fetchBtn) fetchBtn.disabled = false;
+
+    } 
+    // 3. Handle Logic for "Staff Form" (Fresh Entry Button)
+    else if (sectionId === 'staffSection') {
+        if (staffSection) staffSection.classList.remove('hidden');
+        if (feesContainer) feesContainer.classList.remove('hidden');
+
+        if (submitBtn) {
+            submitBtn.classList.remove('hidden');
+            submitBtn.innerText = "Submit Staff Details";
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+            submitBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        }
+        
+        if (updateInput) updateInput.disabled = true;
+        if (fetchBtn) fetchBtn.disabled = true;
+
+    } else {
+        const target = document.getElementById(sectionId);
+        if (target) target.classList.remove('hidden');
+    }
+
+    // 4. Layout Handling
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    if (sectionId === 'staffSection' || sectionId === 'updateSection') {
+        if (sidebar) sidebar.classList.add('hidden');
+        if (mainContent) mainContent.classList.add('w-full', 'ml-0');
+    } else {
+        if (sidebar) sidebar.classList.remove('hidden');
+        if (mainContent) mainContent.classList.remove('w-full', 'ml-0');
+    }
+
+    // 5. Update Page Title
+    const titles = {
+        'staffSection': 'Staff Form',
+        'recordsContainer': 'Staff Records',
+        'transferSection': 'Transfer Staff',
+        'updateSection': 'Update Staff Data'
+    };
+    const titleEl = document.getElementById('pageTitle');
+    if (titleEl) titleEl.innerText = titles[sectionId] || 'Dashboard';
+
+    // 6. Sidebar Styles
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.classList.remove('bg-blue-600', 'text-white', 'font-bold', 'border-l-4', 'border-blue-400');
+    });
+    const activeBtn = document.getElementById('btn-' + sectionId);
+    if (activeBtn) activeBtn.classList.add('bg-blue-600', 'text-white', 'font-bold', 'border-l-4', 'border-blue-400');
+}
+
+
+
+
+
+
+
+// 1. GLOBAL STATE
+// 1. GLOBAL STATE
+let currentUser = { email: '', name: '', role: '' };
+let tempUserForOTP = '';
+
+// 2. LOGIN LOGIC (STEP 1)
+function onLoginSubmit() {
+    const email = document.getElementById('emailInput').value;
+    const pass = document.getElementById('passwordInput').value;
+    const btn = document.getElementById('loginBtn');
+
+    if (!email || !pass) return alert("Please enter credentials");
+
+    // UI Feedback
+    btn.innerText = "Sending OTP...";
+    btn.disabled = true;
+    showLoader(); // Show spinner
+
+    google.script.run
+        .withSuccessHandler(res => {
+            hideLoader();
+            if (res.success) {
+                tempUserForOTP = email; 
+                document.getElementById('credentialsSection').classList.add('hidden');
+                document.getElementById('otpSection').classList.remove('hidden');
+            } else {
+                alert(res.error);
+                resetLoginButton();
+            }
+        })
+        .withFailureHandler(err => {
+            hideLoader();
+            alert("Server Error: " + err);
+            resetLoginButton();
+        })
+        .checkLogin(email, pass);
+}
+
+// 3. OTP LOGIC (STEP 2)
+function onVerifyOTP() {
+    const otp = document.getElementById('otpInput').value;
+    const btn = document.getElementById('verifyBtn');
+
+    if (!otp) return alert("Please enter the OTP");
+
+    btn.innerText = "Verifying...";
+    btn.disabled = true;
+    showLoader();
+
+    google.script.run
+        .withSuccessHandler(res => {
+            hideLoader();
+            if (res.success) {
+                // IMPORTANT: Ensure your .gs returns 'name'
+                currentUser.name = res.name || "User"; 
+                currentUser.role = res.role;
+                currentUser.email = tempUserForOTP;
+                showDashboard();
+            } else {
+                alert(res.error);
+                btn.innerText = "Verify & Login";
+                btn.disabled = false;
+            }
+        })
+        .withFailureHandler(err => {
+            hideLoader();
+            alert("Connection Lost: " + err);
+            btn.innerText = "Verify & Login";
+            btn.disabled = false;
+        })
+        .verifyOTP(tempUserForOTP, otp);
+}
+
+// 4. UI HELPERS
+// 4. UI HELPERS
+function showDashboard() {
+    // 1. Switch Page Containers
+    const loginPage = document.getElementById('loginPage');
+    const appPage = document.getElementById('appPage');
+    
+    if (loginPage) loginPage.classList.add('hidden');
+    if (appPage) appPage.classList.remove('hidden');
+    
+    // 2. FORCE Default View: Use your common showSection helper
+    // This will handle hiding the sidebar and showing the form correctly
+    if (typeof showSection === "function") {
+        showSection('staffSection'); 
+    } else {
+        // Fallback if showSection isn't ready
+        const staffForm = document.getElementById('staffFormContainer');
+        const recordsTable = document.getElementById('recordsTableContainer');
+        const sidebar = document.getElementById('sidebar');
+
+        if (staffForm) staffForm.classList.remove('hidden');
+        if (recordsTable) recordsTable.classList.add('hidden');
+        if (sidebar) sidebar.classList.add('hidden');
+    }
+
+    // 3. Update Welcome Message
+    const welcomeDiv = document.querySelector(".text-sm.text-gray-500");
+    if (welcomeDiv) {
+        welcomeDiv.innerHTML = `Welcome back, <span class="font-bold text-blue-600">${currentUser.name}</span>`;
+    }
+
+    // 4. Load data in background
+    // Ensure your applyFilter("", true) logic is inside loadRecords success handler
+    if (typeof loadRecords === "function") {
+        loadRecords();
+    }
+}
+
+
+function resetLoginButton() {
+    const btn = document.getElementById('loginBtn');
+    btn.innerText = "Login";
+    btn.disabled = false;
+}
+
+function showLoader() {
+    const loader = document.getElementById('loader');
+    if (loader) loader.classList.remove('hidden');
+}
+
+function hideLoader() {
+    const loader = document.getElementById('loader');
+    if (loader) loader.classList.add('hidden');
+}
+
+// 5. IMPROVED LOGOUT (Clears everything)
+function logout() {
+    showLoader();
+    
+    // 1. Clear State
+    currentUser = { email: '', name: '', role: '' };
+    tempUserForOTP = '';
+
+    // 2. Reset UI
+    setTimeout(() => {
+        // Clear all inputs
+        document.getElementById('emailInput').value = '';
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('otpInput').value = '';
+        
+        // Reset Search Input if it exists
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+
+        // Reset Login Buttons
+        resetLoginButton();
+        const vBtn = document.getElementById('verifyBtn');
+        if (vBtn) {
+            vBtn.innerText = "Verify & Login";
+            vBtn.disabled = false;
+        }
+
+
+        // Switch Screens & Reset OTP Sections
+        document.getElementById('appPage').classList.add('hidden');
+        document.getElementById('loginPage').classList.remove('hidden');
+        document.getElementById('credentialsSection').classList.remove('hidden');
+        document.getElementById('otpSection').classList.add('hidden');
+        
+        hideLoader();
+    }, 500);
+}
+
+// 4. STAFF FORM SUBMISSION
+document.getElementById('staffForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const btn = form.querySelector('button[type="submit"]');
+    const fileInput = document.getElementById('photoFile');
+    const formData = Object.fromEntries(new FormData(form));
+    
+    // Correctly get the file from the input
+    const file = fileInput?.files ? fileInput.files[0] : null;
+
+    if (file && file.size > 20480) {
+        alert("File too large! Max 20KB allowed.");
+        return;
+    }
+
+    btn.innerText = 'Submitting...';
+    btn.disabled = true;
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            formData.photoData = event.target.result;
+            executeSubmission(formData, btn, form);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        executeSubmission(formData, btn, form);
+    }
+});
+
+function executeSubmission(formData, btn, form) {
+    google.script.run
+        .withSuccessHandler(() => {
+            alert("Submitted successfully!");
+            form.reset();
+            btn.innerText = 'Submit';
+            btn.disabled = false;
+            if (typeof loadRecords === "function") loadRecords();
+        })
+        .withFailureHandler((err) => {
+            alert("Error: " + err);
+            btn.innerText = 'Submit';
+            btn.disabled = false;
+        })
+        .processForm(formData); 
+}
+
+
+
+// Table view login applies here
+let currentPage = 1;
+let recordsPerPage = 10;
+let allRecords = [];
+let filteredRecords = [];
+
+// 1. Fetch Records from Server
+function loadRecords() {
+    const tableBody = document.getElementById('tableBody');
+    if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="13" class="p-4 text-center italic text-gray-500 animate-pulse">Fetching records...</td></tr>';
+    }
+
+    google.script.run
+        .withSuccessHandler(records => {
+            allRecords = Array.isArray(records) ? records : [];
+            // Flag as 'true' so it loads data without switching the view
+            applyFilter("", true); 
+        })
+        .withFailureHandler(err => {
+            console.error("Fetch failed:", err);
+            const tableBody = document.getElementById('tableBody');
+            if (tableBody) {
+                tableBody.innerHTML = `<tr><td colspan="13" class="p-4 text-center text-red-500">Error loading records.</td></tr>`;
+            }
+        })
+        .getStaffRecords(currentUser.email, currentUser.role);
+}
+
+// 2. Filter Logic
+function applyFilter(value, isInitial = false) {
+    const searchInput = document.getElementById('searchInput');
+    
+    // Force clear the input field on new login
+    if (isInitial && searchInput) {
+        searchInput.value = "";
+        value = ""; 
+    }
+
+    const searchTerm = value.trim().toLowerCase();
+    const isAdmin = typeof currentUser !== 'undefined' && currentUser.role === 'admin';
+
+    if (searchTerm === "") {
+        filteredRecords = isAdmin ? [] : [...allRecords];
+        renderTablePage(1);
+        return;
+    }
+
+    if (isAdmin) {
+        filteredRecords = allRecords.filter(r => {
+            const matchesUser = r.currentUser && r.currentUser.toLowerCase() === searchTerm;
+            const matchesID = r.id && r.id.toLowerCase() === searchTerm;
+            return matchesUser || matchesID;
+        });
+    } else {
+        filteredRecords = allRecords.filter(r => 
+            Object.values(r).some(val => String(val).toLowerCase().includes(searchTerm))
+        );
+    }
+    renderTablePage(1); 
+}
+
+
+
+async function handleFormSubmit(formObject) {
+    const btn = document.getElementById('submitBtn');
+    if (btn.disabled) return false; 
+
+    // --- 1. AADHAAR VALIDATION ---
+    const aadharWithSpaces = (formObject.aadhar?.value || "");
+    const aadharRaw = aadharWithSpaces.replace(/\s/g, ''); 
+    if (aadharRaw.length !== 12) {
+        alert("❌ Error: Aadhaar must be exactly 12 digits.");
+        return false;
+    }
+
+    // --- 2. STRICT AGE LIMIT VALIDATION ---
+    const dobValue = formObject.dob?.value;
+    const designation = formObject.designation?.value || "";
+    if (!dobValue) {
+        alert("❌ Error: Date of Birth is required.");
+        return false;
+    }
+
+    const birthDate = new Date(dobValue);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); 
+    const limitYears = (designation.includes("Principal")) ? 62 : 60;
+    const limitDate = new Date(birthDate);
+    limitDate.setFullYear(birthDate.getFullYear() + limitYears);
+
+    if (today > limitDate) {
+        alert(`❌ Submission Rejected: ${designation} limit is ${limitYears} years. Age exceeded.`);
+        return false;
+    }
+
+    // --- 3. FINAL PAYMENT INTEGRITY CHECK ---
+    const tid = document.getElementById('tid')?.value || "";
+    const amt = document.getElementById('amt')?.value || "";
+    
+    const expectedFee = (designation.includes("Principal")) ? "1500" : "1000";
+    if (tid !== "" && amt !== expectedFee) {
+        alert("❌ Payment Mismatch: The fee for " + designation + " must be ₹" + expectedFee + ". Please re-verify Transaction ID.");
+        return false;
+    }
+
+    btn.disabled = true;
+    btn.innerText = "Submitting...";
+
+    try {
+        // Handle File Upload
+        const fileInput = document.getElementById('photoFile'); 
+        let photoFileData = null;
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            photoFileData = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve({ data: e.target.result.split(',')[1], mimeType: file.type, fileName: file.name });
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Prepare Data Object
+        const expResult = typeof getExperienceData === 'function' ? getExperienceData() : {details: [], totalExperienceText: ""};
+        
+        const formData = {
+            id: document.getElementById('field-id')?.value || "", 
+            name: formObject.name?.value || "",
+            dob: dobValue,
+            designation: designation,
+            course: formObject.course?.value || "",
+            community: formObject.community?.value || "",
+            aadhar: aadharWithSpaces,
+            mobile: formObject.mobile?.value || "",
+            email: formObject.email?.value || "",
+            staffType: formObject.staffType?.value || "",
+            experience: expResult.details, 
+            totalExpText: expResult.totalExperienceText, 
+            
+            transaction_id: tid,
+            tid_limit: document.getElementById('tid_limit')?.value || "1",
+            amount: amt,
+            pdate: document.getElementById('pdate')?.value || "",
+
+            hsc_subject: formObject.hsc_subject?.value || "",
+            hsc_class: formObject.hsc_class?.value || "",
+            hsc_date: formObject.hsc_date?.value || "",
+            hsc_board: formObject.hsc_board?.value || "",
+            ug_subject: formObject.ug_subject?.value || "",
+            ug_class: formObject.ug_class?.value || "",
+            ug_date: formObject.ug_date?.value || "",
+            ug_univ: formObject.ug_univ?.value || "",
+            pg_subject: formObject.pg_subject?.value || "",
+            pg_class: formObject.pg_class?.value || "",
+            pg_date: formObject.pg_date?.value || "",
+            pg_univ: formObject.pg_univ?.value || "",
+            prof_subject: formObject.prof_subject?.value || "",
+            prof_class: formObject.prof_class?.value || "",
+            prof_date: formObject.prof_date?.value || "",
+            prof_univ: formObject.prof_univ?.value || "",
+            prof_subject1: formObject.prof_subject1?.value || "",
+            prof_class1: formObject.prof_class1?.value || "",
+            prof_date1: formObject.prof_date1?.value || "",
+            prof_univ1: formObject.prof_univ1?.value || "", 
+            other_subject: formObject.other_subject?.value || "",
+            other_date: formObject.other_date?.value || "",
+            other_body: formObject.other_body?.value || "",
+            education: {
+                hsc: { marks: formObject.hsc_marks?.value || "" },
+                ug:  { marks: formObject.ug_marks?.value || "" },
+                pg:  { marks: formObject.pg_marks?.value || "" },
+                bed: { marks: formObject.prof_marks?.value || "" },
+                med: { marks: formObject.prof_marks1?.value || "" }
+            },
+            service: {
+                teachingSubject: (formObject.teaching_subject?.value === 'Other') 
+                                 ? (formObject.other_teaching_subject?.value || "Other") 
+                                 : (formObject.teaching_subject?.value || ""),
+                collegiateEntryDate: formObject.collegiate_entry_date?.value || "",
+                presentJoiningDate: formObject.present_joining_date?.value || ""
+            },
+            joiningDate: formObject.joiningDate?.value || "",   
+            approvalDate: formObject.approvalDate?.value || "", 
+            photoFile: photoFileData,
+            requestTimestamp: new Date().getTime() // Secure anti-replay token element
+        };
+
+        // --- NEW: Capture Dynamic Other Qualifications (4-6) ---
+        for (let i = 7; i <= 9; i++) {
+            formData[`prof_subject${i}`] = document.querySelector(`[name="prof_subject${i}"]`)?.value || "";
+            formData[`prof_marks${i}`]   = document.querySelector(`[name="prof_marks${i}"]`)?.value || "";
+            formData[`prof_class${i}`]   = document.querySelector(`[name="prof_class${i}"]`)?.value || "";
+            formData[`prof_date${i}`]    = document.querySelector(`[name="prof_date${i}"]`)?.value || "";
+            formData[`prof_univ${i}`]    = document.querySelector(`[name="prof_univ${i}"]`)?.value || "";
+        }
+
+        const userEmail = (typeof currentUser !== 'undefined' && currentUser.email) ? currentUser.email : "Unknown";
+
+        const nameInput = document.getElementById('name');
+        if (nameInput) {
+            formData['name'] = nameInput.value.toUpperCase().trim();
+        }
+
+        // --- CRYPTOGRAPHIC NETWORK SECURITY LAYER ---
+        const SECRET_KEY = "TNTEU_Staff_Secure_Key_2026!#"; // MUST MATCH APPS SCRIPT
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyvxtJpwzTRlForHzWc2Sw8O3tFZZLFLfjrjWuqMIDQNMJCUI3oxTU1bQO4i_GyZYlDig/exec"; // Replace XXXXXX with live exec URL
+
+        // Inject data structure definitions required by original Apps Script legacy parameter orders
+        const packetData = {
+            formData: formData,
+            userEmail: userEmail
+        };
+
+        const stringifiedBody = JSON.stringify(packetData);
+        const calculatedHash = CryptoJS.HmacSHA256(stringifiedBody, SECRET_KEY);
+        const hexSignature = CryptoJS.enc.Hex.stringify(calculatedHash);
+        const finalTargetUrl = `${WEB_APP_URL}?signature=${hexSignature}`;
+
+        // Send payload via white-label secure network endpoint
+        const response = await fetch(finalTargetUrl, {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: stringifiedBody
+        });
+
+        const res = await response.json();
+
+        // Check verification confirmation code response status
+        if (res.status === "success") {
+            btn.disabled = false;
+            btn.innerText = "Submit Details";
+            alert("✅ Data submitted successfully!");
+
+            // 1. FIRST: CRITICAL IMAGE CLEAR (Runs before form reset)
+            try {
+                // Kill file selector caches completely
+                const fileInputs = document.querySelectorAll('input[type="file"]');
+                fileInputs.forEach(input => {
+                    input.value = ""; 
+                    // Force trigger a change event to clear custom upload widgets
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+
+                // Completely wipe image preview sources out of memory cache
+                const imgPreview = document.getElementById('imagePreview');
+                if (imgPreview) {
+                    imgPreview.removeAttribute('src'); 
+                    imgPreview.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // Blank 1px transparent GIF fallback
+                }
+
+                // Hide the container element safely
+                const prevContainer = document.getElementById('previewContainer');
+                if (prevContainer) {
+                    prevContainer.classList.add('hidden');
+                    prevContainer.style.setProperty('display', 'none', 'important'); // Overrides styling blocks
+                }
+
+                // Execute custom wrapper reset if available
+                if (typeof clearForm === "function") clearForm();
+                if (typeof clearPasteArea === "function") clearPasteArea();
+
+            } catch (imageResetError) {
+                console.error("Image clear block intercepted an error:", imageResetError);
+            }
+
+            // 2. Clear out other dynamic qualification text elements (Rows 7-9)
+            for (let i = 7; i <= 9; i++) {
+                const fields = [`prof_subject${i}`, `prof_marks${i}`, `prof_class${i}`, `prof_date${i}`, `prof_univ${i}`];
+                fields.forEach(fieldName => {
+                    const input = document.querySelector(`[name="${fieldName}"]`);
+                    if (input) input.value = "";
+                });
+            }
+
+            // 3. Structural mutation: slice dynamic elements out of table layout
+            const tbody = document.getElementById('qual-table-body');
+            if (tbody) {
+                while (tbody.rows.length > 6) {
+                    tbody.deleteRow(-1);
+                }
+                rowCount = 6; 
+            }
+
+            // 4. Reset core textual input components safely
+            formObject.reset();
+
+            // 5. Reinitialize fees dependencies configuration
+            const feesDropdown = document.getElementById('feesStatus');
+            if (feesDropdown) feesDropdown.selectedIndex = 0;
+            if (typeof toggleFeesInfo === "function") toggleFeesInfo(); 
+
+            // 6. Component callbacks execution
+            if (typeof resetExperienceRows === "function") resetExperienceRows();
+            if (typeof loadRecords === "function") loadRecords(); 
+            
+            const pd = document.getElementById('pdate');
+            if(pd) { 
+                pd.readOnly = false; 
+                pd.classList.remove('bg-gray-100'); 
+            }
+        } else {
+            btn.disabled = false;
+            btn.innerText = "Submit Details";
+            alert("⚠️ Server error: " + res.message);
+        }
+
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerText = "Submit Details";
+        alert("❌ System Error: " + (e.message || e));
+    }
+    
+    return false;
+}
+
+
+
+
+
+
+
+
+// 1. Updated applyFilter for Admin-specific search
+function applyFilter(value) {
+    const searchTerm = value.trim().toLowerCase();
+    const isAdmin = typeof currentUser !== 'undefined' && currentUser.role === 'admin';
+
+    if (searchTerm === "") {
+        filteredRecords = isAdmin ? [] : [...allRecords];
+        renderTablePage(1);
+        return;
+    }
+
+    if (isAdmin) {
+        // ADMIN: Matches if EITHER the currentUser is exact OR the ID is exact
+        filteredRecords = allRecords.filter(r => {
+            const matchesUser = r.currentUser && r.currentUser.toLowerCase() === searchTerm;
+            const matchesID = r.id && r.id.toLowerCase() === searchTerm;
+            return matchesUser || matchesID;
+        });
+    } else {
+        filteredRecords = allRecords.filter(r => 
+            Object.values(r).some(val => String(val).toLowerCase() === searchTerm)
+        );
+    }
+    renderTablePage(1); 
+}
+
+
+function renderTablePage(page) {
+    currentPage = page;
+    const tableBody = document.getElementById('tableBody');
+    if (!tableBody) return;
+
+    if (typeof renderUI === "function") renderUI();
+
+    tableBody.innerHTML = "";
+
+    const isAdmin = typeof currentUser !== 'undefined' && currentUser.role === 'admin';
+    const searchInput = document.querySelector('#dynamic-search-container input');
+    const searchTerm = searchInput ? searchInput.value.trim() : "";
+
+    if (isAdmin && searchTerm === "") {
+        tableBody.innerHTML = '<tr><td colspan="14" class="p-10 text-center text-blue-600 font-medium border bg-blue-50">Please enter the exact Username or Staff ID in the search box to view records.</td></tr>';
+        return;
+    }
+
+    const start = (page - 1) * recordsPerPage;
+    const end = start + recordsPerPage;
+    const paginatedRecords = filteredRecords.slice(start, end);
+
+    if (paginatedRecords.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="14" class="p-4 text-center text-gray-500 font-medium italic border">No records found matching that search.</td></tr>';
+        return;
+    }
+  // --- DATA NORMALIZATION & STATE IDENTIFICATION ---
+    paginatedRecords.forEach((r, i) => {
+         
+    const sno = start + i + 1; 
+      
+        const sStatus = String(r.status || '').trim().toLowerCase();
+        const tStatus = String(r.transferStatus || '').trim().toLowerCase();
+        
+        const isPending = (sStatus === 'pending' || sStatus === '');
+        const isApproved = (sStatus === 'approved');
+
+        // Logic for Transfer vs Renewal
+        const isTransfer = tStatus.includes("transfer requested");
+        const isRenewal = tStatus.includes("renewal requested");
+        const hasAnyRequest = isTransfer || isRenewal;
+
+        const reqLabel = isRenewal ? 'Renewal' : 'Transfer';
+        const reqType = isRenewal ? 'RENEWAL' : 'TRANSFER';
+
+        // 3. Button Logic
+        let actionHtml = isAdmin ? `
+            <div class="flex flex-col gap-1 min-w-[125px]">
+                <button onclick="handleAction('${r.id}', 'Approved', 'STAFF')" 
+                    class="w-full text-white px-2 py-1 rounded text-[10px] shadow-sm ${isPending ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300 cursor-not-allowed'}" 
+                    ${!isPending ? 'disabled' : ''}>
+                    Approve Staff
+                </button>
+
+                <button onclick="handleAction('${r.id}', 'Approved', '${reqType}')" 
+                    class="w-full text-white px-2 py-1 rounded text-[10px] shadow-sm ${(isApproved && hasAnyRequest) ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'}" 
+                    ${!(isApproved && hasAnyRequest) ? 'disabled' : ''}>
+                    Approve ${reqLabel}
+                </button>
+
+                <button onclick="handleAction('${r.id}', 'Rejected', '${isApproved ? reqType : 'STAFF'}')" 
+                    class="w-full text-white px-2 py-1 rounded text-[10px] shadow-sm bg-red-600 hover:bg-red-700">
+                    Reject ${isApproved ? reqLabel : ''}
+                </button>
+            </div>` : `<span class="text-gray-400 font-medium">-</span>`;
+
+        // 4. Photo Logic
+// 4. Photo Logic (Passport Size Style)
+let photoHtml = (r.photo_url && r.photo_url !== "") 
+    ? `<img src="${r.photo_url}" alt="Photo" 
+        style="width: 42px; height: 54px; 
+               border-radius: 2px; 
+               object-fit: cover; 
+               border: 1px solid #333; 
+               box-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+               margin: auto; 
+               display: block;">`
+    : `<span class="text-[10px] text-gray-400 italic">No Photo</span>`;
+
+
+        // 5. Badge Logic for Status column
+        let statusBadgeClass = "bg-yellow-100 text-yellow-700"; 
+        let displayStatusText = r.status || 'Pending';
+
+        if (isTransfer) {
+            statusBadgeClass = "bg-blue-100 text-blue-700";
+            displayStatusText = "Transfer Requested";
+        } else if (isRenewal) {
+            statusBadgeClass = "bg-purple-100 text-purple-700";
+            displayStatusText = "Renewal Requested";
+        } else if (isApproved) {
+            statusBadgeClass = "bg-green-100 text-green-700";
+        } else if (sStatus === 'rejected') {
+            statusBadgeClass = "bg-red-100 text-red-700";
+        }
+
+        const row = `<tr class="${hasAnyRequest ? 'bg-blue-50/40' : ''}">
+            <td class="p-2 border text-sm text-center">${sno}</td>
+            <td class="p-2 border text-sm">${r.currentUser || ''}</td>
+            <td class="p-2 border text-sm font-bold text-gray-700">${r.id || ''}</td>          
+            <td class="p-2 border text-sm">${r.name || ''}</td>
+            <td class="p-2 border text-sm">${r.designation || ''}</td>
+            <td class="p-2 border text-sm text-nowrap">${r.dob || ''}</td>
+            <td class="p-2 border text-sm">${r.community || ''}</td> 
+            <td class="p-2 border text-sm">${r.course || ''}</td>
+            <td class="p-2 border text-sm">${r.aadhar || ''}</td>
+            <td class="p-2 border text-sm">${r.mobile || ''}</td>
+            <td class="p-2 border text-sm">${r.email || ''}</td>
+            <td class="p-2 border text-center">${photoHtml}</td>
+            <td class="p-2 border text-center">
+                <span class="px-2 py-1 rounded text-[10px] font-bold shadow-sm ${statusBadgeClass}">
+                    ${displayStatusText}
+                </span>
+            </td>
+            <td class="p-2 border">${actionHtml}</td>
+        </tr>`;
+        
+        tableBody.insertAdjacentHTML('beforeend', row);
+    });
+}
+
+
+
+
+// 2. Dynamic UI Injection
+function renderUI() {
+    const tableBody = document.getElementById('tableBody');
+    const table = tableBody.closest('table');
+    const isAdmin = typeof currentUser !== 'undefined' && currentUser.role === 'admin';
+
+    // --- SEARCH BAR (ALWAYS RENDER) ---
+    if (!document.getElementById('dynamic-search-container')) {
+        const searchDiv = document.createElement('div');
+        searchDiv.id = 'dynamic-search-container';
+        searchDiv.className = "flex justify-between items-center mb-4";
+        searchDiv.innerHTML = `
+            <div class="flex gap-2">
+                <button onclick="exportToCSV()" class="bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700">Export CSV</button>
+            </div>
+            <div class="relative w-64">
+                <input type="text" 
+        id="searchInput" 
+        placeholder="${isAdmin ? 'Search by username (email)...' : 'Search records...'}" 
+        oninput="applyFilter(this.value)" 
+        class="w-full border rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+            </div>`;
+        table.parentNode.insertBefore(searchDiv, table);
+    }
+
+    // --- PAGINATION ---
+    const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
+    let footer = document.getElementById('dynamic-pagination');
+    if (footer) footer.remove();
+
+    footer = document.createElement('div');
+    footer.id = 'dynamic-pagination';
+    footer.className = "flex justify-between items-center mt-4 p-3 bg-gray-50 border rounded";
+    footer.innerHTML = `
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-600">Show</span>
+            <select onchange="updateRowsPerPage(this.value)" class="border rounded p-1 text-sm bg-white">
+                <option value="10" ${recordsPerPage === 10 ? 'selected' : ''}>10</option>
+                <option value="25" ${recordsPerPage === 25 ? 'selected' : ''}>25</option>
+                <option value="50" ${recordsPerPage === 50 ? 'selected' : ''}>50</option>
+            </select>
+            <span class="text-sm text-gray-600">of ${filteredRecords.length} entries</span>
+        </div>
+        <div class="flex gap-1">
+            <button onclick="renderTablePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''} class="px-3 py-1 border rounded bg-white text-sm disabled:opacity-50">Prev</button>
+            <button onclick="renderTablePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''} class="px-3 py-1 border rounded bg-white text-sm disabled:opacity-50">Next</button>
+        </div>`;
+    table.parentNode.insertBefore(footer, table.nextSibling);
+}
+
+
+function exportToCSV() {
+    if (!filteredRecords || filteredRecords.length === 0) {
+        return alert("No data to export");
+    }
+
+    const sortedData = [...filteredRecords].sort((a, b) => {
+        const userA = String(a.currentUser || "").toLowerCase();
+        const userB = String(b.currentUser || "").toLowerCase();
+        return userA.localeCompare(userB);
+    });
+
+    const isAdmin = typeof currentUser !== 'undefined' && currentUser.role === 'admin';
+    let headers = [];
+
+    if (isAdmin) {
+        // ADMIN: All structural data fields from Index 0 to Index 72 with descriptive headers
+        headers = [
+            "S.No", "Current User", "Staff ID", "Name", "Designation", "DOB", "Community", "Course", "Aadhar", "Staff Type", "DOJ", "Mobile",
+            "HSC Subject", "HSC Marks", "HSC Class", "HSC Date", "HSC Board",
+            "UG Subject", "UG Marks", "UG Class", "UG Date", "UG Univ",
+            "PG Subject", "PG Marks", "PG Class", "PG Date", "PG Univ",
+            "Prof Subject (BEd)", "BEd Marks", "Prof Class (BEd)", "Prof Date (BEd)", "Prof Univ (BEd)",
+            "Prof Subject 1 (MEd)", "MEd Marks", "Prof Class 1 (MEd)", "Prof Date 1 (MEd)", "Prof Univ 1 (MEd)",
+            "Other Subject", "Other Date", "Other Body",
+            "Teaching Subject", "Collegiate Entry Date", "Present Joining Date",
+            "Transaction ID", "Amount", "Payment Date", "Joining Date", "Approval Date",
+            "Photo Link", "Status", "User Email", "Transfer Status", "Email", "TID Limit",
+            "Empty 53", "Empty 54", "Empty 55", "Empty 56", "Empty 57",
+            "Prof Subject 7", "Prof Marks 7", "Prof Class 7", "Prof Date 7", "Prof Univ 7",
+            "Prof Subject 8", "Prof Marks 8", "Prof Class 8", "Prof Date 8", "Prof Univ 8",
+            "Prof Subject 9", "Prof Marks 9", "Prof Class 9", "Prof Date 9", "Prof Univ 9"
+        ];
+    } else {
+        // STAFF/OTHER: Base profile fields + extra payment information
+        headers = [
+            "S.No", "Current User", "Staff ID", "Name", "Designation", "DOB", 
+            "Community", "Course", "Aadhar", "Mobile", "Email", "Status", 
+            "Transaction ID", "Amount", "Payment Date"
+        ];
+    }
+
+    const rows = sortedData.map((r, index) => {
+        let rowData = [];
+        const escapeCSV = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+        if (isAdmin) {
+            // ADMIN: Maps sequential object variables exactly into array indices 0 to 72
+            rowData = [
+                // Indices 0 - 10 (Profile mapping matching keysToExport properties)
+                escapeCSV(r.currentUser),
+                escapeCSV(r.id),
+                escapeCSV(r.name),
+                escapeCSV(r.designation),
+                escapeCSV(r.dob),
+                escapeCSV(r.community),
+                escapeCSV(r.course),
+                escapeCSV(r.aadhar),
+                escapeCSV(r.staffType),
+                escapeCSV(r.doj),
+                escapeCSV(r.mobile),
+                // Indices 11 - 15 (HSC)
+                escapeCSV(r.formData?.hsc_subject),
+                escapeCSV(r.formData?.education?.hsc?.marks),
+                escapeCSV(r.formData?.hsc_class),
+                escapeCSV(r.formData?.hsc_date),
+                escapeCSV(r.formData?.hsc_board),
+                // Indices 16 - 20 (UG)
+                escapeCSV(r.formData?.ug_subject),
+                escapeCSV(r.formData?.education?.ug?.marks),
+                escapeCSV(r.formData?.ug_class),
+                escapeCSV(r.formData?.ug_date),
+                escapeCSV(r.formData?.ug_univ),
+                // Indices 21 - 25 (PG)
+                escapeCSV(r.formData?.pg_subject),
+                escapeCSV(r.formData?.education?.pg?.marks),
+                escapeCSV(r.formData?.pg_class),
+                escapeCSV(r.formData?.pg_date),
+                escapeCSV(r.formData?.pg_univ),
+                // Indices 26 - 30 (BEd)
+                escapeCSV(r.formData?.prof_subject),
+                escapeCSV(r.formData?.education?.bed?.marks),
+                escapeCSV(r.formData?.prof_class),
+                escapeCSV(r.formData?.prof_date),
+                escapeCSV(r.formData?.prof_univ),
+                // Indices 31 - 35 (MEd)
+                escapeCSV(r.formData?.prof_subject1),
+                escapeCSV(r.formData?.education?.med?.marks),
+                escapeCSV(r.formData?.prof_class1),
+                escapeCSV(r.formData?.prof_date1),
+                escapeCSV(r.formData?.prof_univ1),
+                // Indices 36 - 38 (Other Qualifications)
+                escapeCSV(r.formData?.other_subject),
+                escapeCSV(r.formData?.other_date),
+                escapeCSV(r.formData?.other_body),
+                // Indices 39 - 41 (Service Fields)
+                escapeCSV(r.formData?.service?.teachingSubject),
+                escapeCSV(r.formData?.service?.collegiateEntryDate),
+                escapeCSV(r.formData?.service?.presentJoiningDate),
+                // Indices 42 - 46 (Payment Metrics)
+                escapeCSV(r.formData?.transaction_id),
+                escapeCSV(r.formData?.amount),
+                escapeCSV(r.formData?.pdate),
+                escapeCSV(r.formData?.joiningDate),
+                escapeCSV(r.formData?.approvalDate),
+                // Indices 47 - 52 (Metadata)
+                escapeCSV(r.photoLink || r.photo_url),
+                escapeCSV(r.status || "Pending"),
+                escapeCSV(r.userEmail),
+                escapeCSV(r.transferStatus), // Index 50 (Mapped from basic property)
+                escapeCSV(r.email),          // Index 51 (Mapped from basic property)
+                escapeCSV(r.tidLimit),        // Index 52
+                // Indices 53 - 57 (Unassigned Array Padding)
+                "", "", "", "", "",
+                // Indices 58 - 62 (Other Qualification 1)
+                escapeCSV(r.formData?.prof_subject7),
+                escapeCSV(r.formData?.prof_marks7),
+                escapeCSV(r.formData?.prof_class7),
+                escapeCSV(r.formData?.prof_date7),
+                escapeCSV(r.formData?.prof_univ7),
+                // Indices 63 - 67 (Other Qualification 2)
+                escapeCSV(r.formData?.prof_subject8),
+                escapeCSV(r.formData?.prof_marks8),
+                escapeCSV(r.formData?.prof_class8),
+                escapeCSV(r.formData?.prof_date8),
+                escapeCSV(r.formData?.prof_univ8),
+                // Indices 68 - 72 (Other Qualification 3)
+                escapeCSV(r.formData?.prof_subject9),
+                escapeCSV(r.formData?.prof_marks9),
+                escapeCSV(r.formData?.prof_class9),
+                escapeCSV(r.formData?.prof_date9),
+                escapeCSV(r.formData?.prof_univ9)
+            ];
+        } else {
+            // STAFF/OTHER: Base profile setup + appended payment parameters
+            const keysToExport = ["currentUser", "id", "name", "designation", "dob", "community", "course", "aadhar", "mobile", "email", "status"];
+            rowData = keysToExport.map(key => escapeCSV(r[key]));
+            
+            rowData.push(escapeCSV(r.formData?.transaction_id));
+            rowData.push(escapeCSV(r.formData?.amount));
+            rowData.push(escapeCSV(r.formData?.pdate));
+        }
+
+        return [index + 1, ...rowData].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `${isAdmin ? 'Admin' : 'Staff'}_Report_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+}
+
+
+
+/**
+ * Handles Approval/Rejection for both Staff and Transfers
+ * @param {string} recordId - The Staff ID
+ * @param {string} status - 'Approved' or 'Rejected'
+ * @param {string} type - 'STAFF' or 'TRANSFER'
+ */
+function handleAction(recordId, status, type) {
+    let extraData = "";
+    // Save reference to button safely
+    const btn = event ? (event.currentTarget || event.target) : null;
+
+    // 1. Context-aware prompts
+    const actionName = (status === 'Approved' ? 'Approval' : 'Rejection');
+    
+    // Determine the subject based on type
+    let subject = "Staff Registration";
+    if (type === 'TRANSFER') subject = "Transfer";
+    if (type === 'RENEWAL') subject = "Renewal";
+
+    if (status === 'Approved') {
+        // Updated prompt to include Renewal
+        extraData = prompt(`Enter ${subject} Date (DD-MM-YYYY):`, 
+                           new Date().toLocaleDateString('en-GB').replace(/\//g, '-'));
+        if (!extraData) return; 
+    } else {
+        extraData = prompt(`Please enter the reason for ${subject} ${actionName}:`);
+        if (!extraData || extraData.trim() === "") {
+            alert(`A reason is required for ${subject} rejection.`);
+            return;
+        }
+    }
+
+    // 2. UI Feedback
+    let originalText = "";
+    if (btn) {
+        originalText = btn.innerText;
+        btn.innerText = "Wait..."; 
+        btn.disabled = true;
+    }
+
+    // 3. Server Call
+    google.script.run
+        .withSuccessHandler(response => {
+            if (response === "Success") {
+                alert(`${subject} ${status} successfully.`);
+                // Refresh data
+                if (typeof loadRecords === "function") loadRecords(); 
+                else if (typeof renderTablePage === "function") renderTablePage(currentPage);
+            } else {
+                alert("Server Error: " + response);
+                if (btn) {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            }
+        })
+        .withFailureHandler(err => {
+            alert("Critical Error: " + err);
+            if (btn) {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        })
+        .approveOrRejectStaff(recordId, status, extraData, type); 
+}
+
+
+
+
+// function filterTable() {
+//     let input = document.getElementById("searchInput").value.toUpperCase();
+//     let rows = document.getElementById("tableBody").getElementsByTagName("tr");
+//     for (let i = 0; i < rows.length; i++) {
+//         rows[i].style.display = rows[i].innerText.toUpperCase().includes(input) ? "" : "none";
+//     }
+// }
+
+
+function clearForm() {
+    document.getElementById('staffForm').reset();
+    document.getElementById('previewContainer').classList.add('hidden');
+    document.getElementById('imagePreview').src = "";
+}
+
+
+function toggleSubmitButton() {
+    const isChecked = document.getElementById('declaration').checked;
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (isChecked) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+// Ensure the button starts disabled when the page loads
+// document.addEventListener('DOMContentLoaded', () => {
+//     const submitBtn = document.getElementById('submitBtn');
+//     submitBtn.disabled = true;
+//     submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+// });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Check if the button exists before touching it
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        console.warn("Could not find element with ID 'submitBtn'");
+    }
+});
+
+function printApplication() {
+    if (typeof filteredRecords === "undefined" || !filteredRecords || filteredRecords.length === 0) {
+        alert("No records found to print. Please search for a specific record first.");
+        return;
+    }
+
+    // High-performance direct array cleaning map loop
+    const activeStaffIds = [];
+    for (let i = 0; i < filteredRecords.length; i++) {
+        const rec = filteredRecords[i];
+        if (rec && rec.id) {
+            activeStaffIds.push(String(rec.id).replace(/[^0-9]/g, ''));
+        }
+    }
+
+    if (activeStaffIds.length === 0) {
+        alert("Selected records do not contain valid numerical IDs.");
+        return;
+    }
+
+    // INSTANT FIX: Launch the window immediately to drop perceived server lag
+    const printWindow = window.open('', '_blank', 'width=950,height=1000');
+    if (!printWindow) {
+        alert("Popup blocker active. Please allow popups to process printing forms.");
+        return;
+    }
+
+    // Inject immediate document container structure with a loading interface
+    const styleAndLoader = `
+    <!DOCTYPE html><html><head><title>Staff Print Layout Profiles</title>
+    <style>
+        @page { size: A4 portrait; margin: 0; }
+        html, body { width: 210mm; background: #fff; font-family: Arial, sans-serif; margin: 0; padding: 0; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .page-break { page-break-after: always; page-break-inside: avoid; }
+        .application-form { 
+            width: 210mm; min-height: 297mm; padding: 12mm 15mm; border: none; 
+            box-sizing: border-box; position: relative; background: #fff;
+            content-visibility: visible; page-break-inside: avoid; overflow: hidden;
+        }
+        
+        .uni-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px; margin-right: 125px; }
+        .uni-name { font-family: 'Times New Roman', Times, serif; font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 0; color: #800000; }
+        .uni-sub { font-size: 8.5px; font-weight: bold; margin: 2px 0 1px 0; letter-spacing: 0.3px; }
+        .uni-address { font-size: 8.5px; margin: 1px 0; }
+        
+        .photo-box { position: absolute; top: 5mm; right: 15mm; width: 110px; height: 120px; border: 2px solid #000; background: #fafafa; display: block; overflow: hidden; box-sizing: border-box; z-index: 10; }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .photo-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 8px; font-weight: bold; line-height: 1.3; color: #000; padding: 5px; box-sizing: border-box; text-transform: uppercase; }
+        
+        .doc-title { text-align: center; font-size: 11.5px; font-weight: bold; background: #f2f2f2; border: 1px solid #000; padding: 5px; margin: 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+        .section-header { font-size: 10px; font-weight: bold; text-decoration: underline; margin-top: 8px; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .data-table, .exp-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; table-layout: fixed; }
+        .data-table td, .exp-table th, .exp-table td { border: 1px solid #000; padding: 3px 5px; font-size: 9.5px; vertical-align: top; word-wrap: break-word; }
+        .exp-table th { background: #f2f2f2; text-align: center; font-weight: bold; font-size: 9px; text-transform: uppercase; vertical-align: middle; }
+        .label-col { background: #f9f9f9; font-weight: bold; width: 22%; }
+        .declaration-text { font-size: 8.5px; text-align: justify; margin-top: 8px; line-height: 1.3; font-style: italic; border: 1px solid #ccc; padding: 5px; background: #fafafa; }
+        .footer-sigs { margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .sig-area { text-align: center; width: 200px; font-size: 9.5px; }
+        .sig-line { margin-top: 20px; border-top: 1.5px solid #000; padding-top: 3px; font-weight: bold; text-transform: uppercase; font-size: 8.5px; }
+        
+        .status-pending { background-color: #fff3cd !important; color: #856404 !important; font-weight: bold; text-align: center; }
+        .status-approved { background-color: #d4edda !important; color: #155724 !important; font-weight: bold; text-align: center; }
+        
+        /* Non-blocking Loader Ring CSS */
+        #print-loader { position: fixed; top:0; left:0; width:100%; height:100%; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; }
+        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #800000; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media print { #print-loader { display: none !important; } .application-form { border: 2px solid #000; margin: 0; } }
+    </style>
+    </head>
+    <body>
+        <div id="print-loader">
+            <div class="spinner"></div>
+            <div style="font-size:16px; font-weight:bold; color:#333; font-family:Arial;">Compiling Print Previews...</div>
+            <div style="font-size:12px; color:#666; margin-top:5px; font-family:Arial;">Assembling all filtered records progressively.</div>
+        </div>
+        <div id="print-content"></div>
+    </body></html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(styleAndLoader);
+    printWindow.document.close();
+
+    // Call server-side runtime engine while preview shell is open displaying the loader
+    google.script.run.withSuccessHandler(function(freshHydratedRecords) {
+        const contentTarget = printWindow.document.getElementById('print-content');
+        const loaderBlock = printWindow.document.getElementById('print-loader');
+        
+        if (!freshHydratedRecords || freshHydratedRecords.length === 0) {
+            if (loaderBlock) loaderBlock.innerHTML = '<div style="color:red; font-weight:bold; font-family:Arial;">Error loading printable record payloads from server.</div>';
+            return;
+        }
+
+        // Direct compiled buffer array rendering strategy (Avoids heavy string mutations in loops)
+        const htmlBuffer = [];
+        const recordsLength = freshHydratedRecords.length;
+        
+        // Fast pre-compiled regex allocations to save CPU cycles
+        const driveRegex = /drive\.google\.com|google\.com\/file/;
+        const idRegex = /\/d\/([a-zA-Z0-9_-]+)/;
+        const fallbackIdRegex = /id=([a-zA-Z0-9_-]+)/;
+
+        for (let index = 0; index < recordsLength; index++) {
+            const r = freshHydratedRecords[index];
+            if (!r) continue;
+            
+            let updatedPhotoUrl = (r.photo_url || '').toString().trim();
+            if (driveRegex.test(updatedPhotoUrl)) {
+                const matches = updatedPhotoUrl.match(idRegex) || updatedPhotoUrl.match(fallbackIdRegex);
+                if (matches) {
+                    const cleanId = matches[1];
+                    updatedPhotoUrl = `https://googleusercontent.com{cleanId}=w400-h500-iv1`;
+                }
+            }
+
+            const validHistory = r.experienceHistory || [];
+            let expRows = "";
+            if (validHistory.length > 0) {
+                // Slice history layout loop container bounds to a maximum of 3 entries to safeguard the single page rule
+                const renderLimit = Math.min(validHistory.length, 3);
+                for (let i = 0; i < renderLimit; i++) {
+                    const ex = validHistory[i];
+                    expRows += `<tr><td style="text-align:center; width:8%;">${i + 1}</td><td style="width:45%;">${ex.ccode || '-'} - ${ex.college || '-'}</td><td style="width:20%;">${ex.designation || '-'}</td><td style="width:15%;">${ex.fdate || '-'} / ${ex.tdate || '-'}</td><td style="text-align:center; width:20%;">${ex.duration || '-'}</td></tr>`;
+                }
+            } else {
+                expRows = `<tr><td colspan="4" style="text-align:center; padding: 6px;">No prior service history recorded.</td></tr>`;
+            }
+
+            const validOthers = r.others || [];
+            let otherQualRows = "";
+            if (validOthers.length > 0) {
+                for (let i = 0; i < validOthers.length; i++) {
+                    const q = validOthers[i];
+                    otherQualRows += `<tr><td>${q.subject || '-'}</td><td style="text-align:center;">${q.marks || '-'}%</td><td style="text-align:center;">${q.grade || '-'}</td><td style="text-align:center;">${q.date || '-'}</td><td>${q.univ || '-'}</td></tr>`;
+                }
+            } else {
+                otherQualRows = `<tr><td colspan="5" style="text-align:center; color:#555; padding: 6px;">No additional dynamic qualifications loaded.</td></tr>`;
+            }
+
+            htmlBuffer.push(`
+        <div class="application-form ${index < recordsLength - 1 ? 'page-break' : ''}">
+            <div class="photo-box">
+                ${updatedPhotoUrl ? `
+                    <img src="${updatedPhotoUrl}" referrerpolicy="no-referrer" alt="Staff Photo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="photo-fallback" style="display:none;">AFFIX<br>PASSPORT SIZE<br>PHOTO</div>
+                ` : `
+                    <div class="photo-fallback">AFFIX<br>PASSPORT SIZE<br>PHOTO</div>
+                `}
+            </div>
+
+            <div class="uni-header">
+                <h1 class="uni-name">Tamil Nadu Teachers Education University</h1>
+                <p class="uni-sub">STATE UNIVERSITY ESTABLISHED BY THE GOVERNMENT OF TAMIL NADU</p>
+                <p class="uni-address">Gangaiamman Koil Street, Karapakkam, Chennai - 600 097</p>
+            </div>
+
+            <div class="doc-title">STAFF ENROLLMENT & SERVICE PROFILE DETAILS</div>
+
+            <div class="section-header">I. PERSONAL DETAILS</div>
+            <table class="data-table">
+                <tr>
+                    <td class="label-col">STAFF UNIQUE ID.</td><td><strong>${r.id || '-'}</strong></td>
+                    <td class="label-col">Staff Type</td><td>${r.staffType || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Full Name (in Block Letters)</td><td colspan="3" style="text-transform: uppercase; font-weight: bold;">
+        ${r.name ? String(r.name).toUpperCase() : '-'}
+                </tr>
+                <tr>
+                    <td class="label-col">Date of Birth</td><td>${r.dob || '-'}</td>
+                    <td class="label-col">Aadhar (Last 4)</td><td>XXXX-XXXX-${(r.aadhar || "").toString().replace(/\s/g, '').slice(-4) || 'XXXX'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Designation</td><td>${r.designation || '-'}</td>
+                    <td class="label-col">Course</td><td>${r.course || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Community</td><td>${r.community || '-'}</td>
+                    <td class="label-col">Mobile Number</td><td>${r.mobile || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Email Address</td><td colspan="3">${r.email || '-'}</td>
+                </tr>
+            </table>
+
+            <div class="section-header">II. EDUCATION ACADEMIC CREDENTIALS</div>
+            <table class="exp-table">
+                <thead>
+                    <tr>
+                        <th style="width:16%">Degree Level</th>
+                        <th style="width:24%">Subject / Specialization</th>
+                        <th style="width:10%">Marks %</th>
+                        <th style="width:12%">Class / Grade</th>
+                        <th style="width:26%">Board / University Name</th>
+                        <th style="width:12%">Passing Year-Month</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td class="label-col">HSC / Equivalent</td><td>${r.hscSubject || '-'}</td><td style="text-align:center">${r.hscMarks || '-'}%</td><td style="text-align:center">${r.hscClass || '-'}</td><td>${r.hscBoard || '-'}</td><td style="text-align:center">${r.hscDate || '-'}</td></tr>
+                    <tr><td class="label-col">Undergraduate (UG)</td><td>${r.ugSubject || '-'}</td><td style="text-align:center">${r.ugMarks || '-'}%</td><td style="text-align:center">${r.ugClass || '-'}</td><td>${r.ugUniv || '-'}</td><td style="text-align:center">${r.ugDate || '-'}</td></tr>
+                    <tr><td class="label-col">Postgraduate (PG)</td><td>${r.pgSubject || '-'}</td><td style="text-align:center">${r.pgMarks || '-'}%</td><td style="text-align:center">${r.pgClass || '-'}</td><td>${r.pgUniv || '-'}</td><td style="text-align:center">${r.pgDate || '-'}</td></tr>
+                    <tr><td class="label-col">Professional (B.Ed)</td><td>${r.bedSubject || '-'}</td><td style="text-align:center">${r.bedMarks || '-'}%</td><td style="text-align:center">${r.bedClass || '-'}</td><td>${r.bedUniv || '-'}</td><td style="text-align:center">${r.bedDate || '-'}</td></tr>
+                    <tr><td class="label-col">Professional (M.Ed)</td><td>${r.medSubject || '-'}</td><td style="text-align:center">${r.medMarks || '-'}%</td><td style="text-align:center">${r.medClass || '-'}</td><td>${r.medUniv || '-'}</td><td style="text-align:center">${r.medDate || '-'}</td></tr>
+                    <tr><td class="label-col">SET/NET/Ph.D</td><td colspan="2">${r.otherSubject || '-'}</td><td style="text-align:center">N/A</td><td>${r.otherBody || '-'}</td><td style="text-align:center">${r.otherDate || '-'}</td></tr>
+                </tbody>
+            </table>
+
+            <div class="section-header">III. ADDITIONAL QUALIFICATIONS</div>
+            <table class="exp-table">
+                <thead>
+                    <tr>
+                        <th style="width:25%">Degree / Subject</th>
+                        <th style="width:12%">Marks %</th>
+                        <th style="width:13%">Class</th>
+                        <th style="width:15%">Passing Year-Month</th>
+                        <th style="width:35%">Board / University</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${otherQualRows}
+                </tbody>
+            </table>
+
+            <div class="section-header">IV. SUBJECT AND SERVICE HISTORY</div>
+            <table class="data-table">
+                <tr>
+                    <td class="label-col">Teaching Subject</td><td><strong>${r.teachingSubject || '-'}</strong></td>
+                    <td class="label-col">Total Service Experience</td><td><strong>${r.totalExpText || '-'}</strong></td>
+                </tr>
+                <tr>
+                    <td class="label-col">Collegiate Entry Date</td><td>${r.collegiateEntryDate || '-'}</td>
+                    <td class="label-col">Joining Date</td><td>${r.presentJoiningDate || '-'}</td>
+                </tr>
+            </table>
+            
+            <table class="exp-table" style="margin-top: 4px;">
+                <thead>
+                    <tr>
+                        <th style="width:8%">S.No</th>
+                        <th style="width:45%">College Code / College Name</th>
+                        <th style="width:20%">Designation Held</th>
+                        <th style="width:15%">From Date / To Date</th>
+                        <th style="width:20%">Experience</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${expRows}
+                </tbody>
+            </table>
+
+            <div class="section-header">V. TRANSACTION DETAILS AND STATUS</div>
+            <table class="data-table">
+                <tr>
+                    <td class="label-col">Application Mode</td><td>${r.applyMode || 'ONLINE'}</td>
+                    <td class="label-col">Current Status</td><td><strong>${r.status || '-'}</strong></td>
+                </tr>
+                <tr>
+                    <td class="label-col">Transaction Reference ID</td><td>${r.transactionId || '-'}</td>
+                    <td class="label-col">Amount Paid</td><td>Rs. ${r.amount || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Payment Date</td><td>${r.transactionDate || '-'}</td>
+                    <td class="label-col">TID Limit Tracking</td><td>${r.tidLimit || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">University Joining Date</td><td>${r.joiningDate || '-'}</td>
+                    <td class="label-col">Approval Date</td><td>${r.approvalDate || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="label-col">Reason for Rejection (if any)</td><td>${r.relievedDate || 'N/A'}</td>
+                    <td class="label-col">Submitted By</td><td><small>${r.userEmail || '-'}${r.accountName ? `(${r.accountName})` : ''}</small></td>
+                </tr>
+            </table>
+
+            <div class="declaration-text">
+                <strong>DECLARATION:</strong> I hereby declare that all the information provided in this summary sheet is true and correct to the best of my knowledge and belief. I understand that if any part of the information is found to be false or incorrect, my enrollment is liable to be cancelled without further notice.
+            </div>
+
+            <div class="footer-sigs">
+                <div class="sig-area"><p style="text-align: left; margin: 0;">Date: .......................</p></div>
+                <div class="sig-area"><div class="sig-line">Signature of Staff</div></div>
+                <div class="sig-area"><div class="sig-line">Signature of the Principal with Seal</div></div>
+            </div>
+        </div>`);
+        }
+
+        // Output completely built document payload to document object context instance
+        if (contentTarget) contentTarget.innerHTML = htmlBuffer.join('');
+        if (loaderBlock) loaderBlock.style.display = 'none';
+
+        // Trigger native browser print system UI panel
+        printWindow.focus();
+        setTimeout(function() { 
+            printWindow.print(); 
+        }, 150);
+
+    }).getBulkStaffPrintData(activeStaffIds);
+}
+
+
+function prepareForm(type, event) {
+    // 1. Hide all other sections, show transfer section
+    document.querySelectorAll('.form-section').forEach(s => s.classList.add('hidden')); // Assuming other sections have this class
+    
+    if (type === 'transfer') {
+        document.getElementById('transfer-section').classList.remove('hidden');
+    }
+}
+
+function fetchStaffData() {
+    const idInput = document.getElementById('search-id');
+    const id = idInput.value.trim();
+    if (!id) return alert("Please enter a Unique ID.");
+
+    const mode = document.querySelector('input[name="applyMode"]:checked')?.value;
+    if (!mode) return alert("Please select Mode (Transfer or Renewal) first.");
+
+    // Get current logged-in user email from your existing global variable
+    const userEmail = (typeof currentUser !== 'undefined' && currentUser.email) ? currentUser.email : "";
+
+    const searchBtn = document.querySelector('button[onclick="fetchStaffData()"]');
+    searchBtn.innerText = "Searching...";
+    searchBtn.disabled = true;
+
+    resetExperienceRows(); 
+
+    google.script.run.withSuccessHandler(data => {
+        searchBtn.innerText = "Search";
+        searchBtn.disabled = false;
+        idInput.value = ''; 
+
+        // Handle error strings from server (Ownership Mismatch, etc.)
+        if (typeof data === 'string' && data.startsWith("Error")) {
+            return alert(data);
+        }
+
+        if (data && data.basic) {
+          
+            if (data.alreadySubmitted) {
+                alert(`⚠️ A ${mode} request is already pending for ID: ${id}`);
+                return;
+            }
+
+            // --- Apply Visual Highlights ---
+            const fields = ['field-id', 'field-name', 'field-dob', 'field-aadhar', 'field-email'];
+            const themeClass = mode === 'transfer' ? 'border-blue-500' : 'border-green-500';
+            const bgClass = mode === 'transfer' ? 'bg-blue-50' : 'bg-green-50';
+
+            fields.forEach(fieldId => {
+                const el = document.getElementById(fieldId);
+                if(el) el.className = `p-2 border rounded w-full ${themeClass} ${bgClass}`;
+            });
+
+            document.getElementById('field-id').value = data.basic.id;
+            document.getElementById('field-name').value = data.basic.name;
+            document.getElementById('field-dob').value = data.basic.dob;
+            document.getElementById('field-aadhar').value = data.basic.aadhar;
+            document.getElementById('field-email').value = data.basic.email;
+                   
+            const container = document.getElementById('fetchedExperienceContainer');
+            if (container) {
+                container.innerHTML = data.pastExperience.length ? '' : '<p class="text-xs text-gray-500 italic">No previous records found.</p>';
+                data.pastExperience.forEach(exp => {
+                    container.insertAdjacentHTML('beforeend', `
+                        <div class="grid grid-cols-5 gap-2 p-1 bg-gray-100 border rounded text-[10px] opacity-70 mb-1">
+                            <span>${exp.code}</span><span>${exp.name}</span><span>${exp.designation}</span>
+                            <span>${exp.from}</span><span>${exp.to}</span>
+                        </div>`);
+                });
+            }
+            
+            if (typeof validateForm === "function") validateForm();
+        } else { 
+            alert("Staff ID not found or not currently Approved."); 
+        }
+    })
+    .withFailureHandler(err => {
+        searchBtn.innerText = "Search";
+        searchBtn.disabled = false;
+        alert("System Error: " + err);
+    })
+    .searchStaff(id, mode, userEmail); // Now passing userEmail to the server
+}
+
+
+
+
+document.getElementById('staff-transfer-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submit-transfer');
+    const staffId = document.getElementById('field-id').value;
+    const mode = document.querySelector('input[name="applyMode"]:checked')?.value;
+    
+    // --- NEW: Capture Transaction Fields ---
+    const transId = document.getElementById('field-trans-id').value;
+    const transAmount = document.getElementById('field-trans-amount').value;
+    const transDate = document.getElementById('field-trans-date').value;
+    
+    if(!staffId) return alert("Please fetch staff data first.");
+    if(!mode) return alert("Please select application mode.");
+
+    // --- NEW: Validation for Transaction Details ---
+    if(!transId || !transAmount || !transDate) {
+        return alert("Please enter Transaction ID, Amount, and Date.");
+    }
+
+    // Validation for Relieved Date: Only required for Transfer
+    const relieved = document.getElementById('field-relieved-date').value;
+    if(mode === 'transfer' && !relieved) {
+        return alert("Please enter the Relieved Date for Transfer.");
+    }
+
+    const expResult = getExperienceData();
+    if (expResult.details.length === 0) return alert("Please enter current experience details.");
+
+    const firstRow = expResult.details[0];
+    const formData = {
+        id: staffId,
+        name: document.getElementById('field-name').value,
+        aadhar: document.getElementById('field-aadhar').value,
+        email: document.getElementById('field-email').value, 
+        relievedDate: mode === 'transfer' ? relieved : "Renewal",
+        applyMode: mode,
+        // --- NEW: Added to formData object ---
+        transactionId: transId,
+        amount: transAmount,
+        transactionDate: transDate,
+        submittedBy: (typeof currentUser !== 'undefined' ? currentUser.email : "") || " ", 
+        currentExp: {
+            code: firstRow.collegeCode,
+            name: firstRow.collegeName,
+            designation: firstRow.designation,
+            from: firstRow.fromDate,
+            to: firstRow.toDate,
+            totalExpText: expResult.totalExperienceText 
+        }
+    };
+
+    if(submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerText = "Submitting...";
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    google.script.run.withSuccessHandler((response) => {
+        const shouldReset = response === "Success" || 
+                            response.includes("same college") || 
+                            response.includes("already registered");
+
+        if (response === "Success") {
+            alert(mode === 'transfer' ? "Transfer Request Submitted!" : "Renewal Request Submitted!");
+        } else {
+            alert(response);
+        }
+
+        if (shouldReset) {
+            document.getElementById('staff-transfer-form').reset();
+            document.getElementById('search-id').value = ''; 
+            document.getElementById('fetchedExperienceContainer').innerHTML = '';
+            if (typeof resetExperienceRows === "function") resetExperienceRows(); 
+            
+            const toDateInput = document.getElementById('toDate');
+            if (toDateInput) toDateInput.value = new Date().toISOString().split('T')[0];
+        }
+
+        if(submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = mode === 'transfer' ? "Submit Transfer" : "Process Renewal";
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    })
+    .withFailureHandler((err) => {
+        alert("System Error: " + err);
+        if(submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Submit Request";
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    })
+    .submitTransferData(formData);
+});
+
+
+
+
+function handleModeSwitch(mode) {
+    const section = document.getElementById('transferSection');
+    const relievingDiv = document.getElementById('relieving-section');
+    const formTitle = document.getElementById('form-title');
+    const submitBtn = document.getElementById('submit-transfer');
+    const checkLabel = document.getElementById('checkbox-label') || document.querySelector('label[for="apply-check"]');
+
+    // 1. Reveal the form section
+    section.classList.remove('hidden');
+
+    // 2. Reset Fields Styling and Data on switch
+    const fields = ['field-id', 'field-name', 'field-dob', 'field-aadhar', 'field-email'];
+    fields.forEach(f => {
+        const el = document.getElementById(f);
+        if(el) {
+            el.className = "p-2 bg-gray-100 border rounded w-full"; 
+            el.value = ""; 
+        }
+    });
+    
+    // Clear Experience Container & Uncheck Box
+    document.getElementById('fetchedExperienceContainer').innerHTML = '';
+    const applyCheck = document.getElementById('apply-check');
+    if(applyCheck) applyCheck.checked = false;
+
+    // 3. Adjust UI based on mode
+    if (mode === 'transfer') {
+        relievingDiv.style.display = "block"; 
+        document.getElementById('field-relieved-date').required = true;
+        formTitle.innerText = "Transfer Staff Request";
+        if(checkLabel) checkLabel.innerText = "Apply for Transfer Request";
+        
+        // Button Styling: Blue Theme
+        submitBtn.innerText = "Submit Transfer";
+        submitBtn.className = "w-full bg-blue-600 text-white py-2 rounded opacity-50 cursor-not-allowed transition-all";
+    } else {
+        relievingDiv.style.display = "none"; 
+        document.getElementById('field-relieved-date').required = false;
+        formTitle.innerText = "Staff Renewal Request";
+        if(checkLabel) checkLabel.innerText = "Apply for Staff Renewal";
+        
+        // Button Styling: Green Theme
+        submitBtn.innerText = "Process Renewal";
+        submitBtn.className = "w-full bg-green-600 text-white py-2 rounded opacity-50 cursor-not-allowed transition-all";
+    }
+}
+
+// Updated toggleSubmit to maintain the color theme
+function toggleSubmit() {
+    const checkbox = document.getElementById('apply-check');
+    const btn = document.getElementById('submit-transfer');
+    
+    if (checkbox.checked) {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        btn.disabled = true;
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+
+function addExperienceRow() {
+    const container = document.getElementById('experienceContainer');
+    const rowHtml = `
+        <div class="experience-row grid grid-cols-5 gap-2 p-2 bg-gray-50 rounded border">
+            <input type="text" name="collegeCode[]" placeholder="Code" class="p-2 border rounded text-xs">
+            <input type="text" name="collegeName[]" placeholder="College Name" class="p-2 border rounded text-xs">
+            <input type="text" name="designation[]" placeholder="Designation" class="p-2 border rounded text-xs">
+            <input type="date" name="fromDate[]" class="p-2 border rounded text-xs" title="From Date" onchange="calculateTotalExperience()">
+            <div class="flex gap-1">
+                <input type="date" name="toDate[]" class="p-2 border rounded text-xs w-full" title="To Date" onchange="calculateTotalExperience()">
+                <button type="button" onclick="removeRow(this)" class="text-red-500 font-bold px-2 hover:bg-red-100 rounded">×</button>
+            </div>
+        </div>`;
+    
+    container.insertAdjacentHTML('beforeend', rowHtml);
+    return container.lastElementChild; 
+}
+
+
+
+function removeRow(btn) {
+    const container = document.getElementById('experienceContainer');
+    const rows = container.querySelectorAll('.experience-row');
+    
+    if (rows.length > 1) {
+        btn.closest('.experience-row').remove();
+        // Trigger calculation if the function exists
+        if (typeof calculateTotalExperience === 'function') calculateTotalExperience();
+    } else {
+        alert("At least one experience record is required.");
+    }
+}
+
+
+
+function calculateTotalExperience() {
+    const container = document.getElementById('experienceContainer');
+    const fromDates = container.querySelectorAll('[name="fromDate[]"]');
+    const toDates = container.querySelectorAll('[name="toDate[]"]');
+    let totalDays = 0;
+
+    fromDates.forEach((fromEl, i) => {
+        const fromVal = fromEl.value;
+        const toVal = toDates[i].value;
+
+        if (fromVal && toVal) {
+            const start = new Date(fromVal);
+            const end = new Date(toVal);
+            const diff = (end - start) / (1000 * 60 * 60 * 24);
+            if (diff > 0) totalDays += diff;
+        }
+    });
+
+    // Convert totalDays to Y/M/D format and update your row[57] display
+    const years = Math.floor(totalDays / 365);
+    const months = Math.floor((totalDays % 365) / 30);
+    const result = `${years}Y ${months}M`;
+    
+    // Update the UI display field
+    const display = document.getElementById('totalExperienceDisplay');
+    if (display) display.value = result;
+}
+
+function getExperienceData() {
+    const rows = document.querySelectorAll('.experience-row');
+    let data = [];
+    let grandTotalMonths = 0;
+
+    rows.forEach(row => {
+        const collegeName = row.querySelector('[name="collegeName[]"]').value;
+        const fromDate = row.querySelector('[name="fromDate[]"]').value;
+        const toDate = row.querySelector('[name="toDate[]"]').value;
+
+        if (collegeName.trim() !== "" && fromDate && toDate) {
+            const start = new Date(fromDate);
+            const end = new Date(toDate);
+            let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+            if (months < 0) months = 0;
+            grandTotalMonths += months;
+
+            data.push({
+                collegeCode: row.querySelector('[name="collegeCode[]"]').value,
+                collegeName: collegeName,
+                designation: row.querySelector('[name="designation[]"]').value,
+                fromDate: fromDate,
+                toDate: toDate
+            });
+        }
+    });
+
+    return {
+        details: data,
+        totalExperienceText: `${Math.floor(grandTotalMonths / 12)}y ${grandTotalMonths % 12}m`
+    };
+}
+
+function resetExperienceRows() {
+    const container = document.getElementById('experienceContainer');
+    const rows = container.querySelectorAll('.experience-row');
+    const submitBtn = document.querySelector('#staff-transfer-form button[type="submit"]');
+    const basicFields = ['field-id', 'field-name', 'field-dob', 'field-aadhar', 'field-email', 'field-relieved-date'];
+
+    // 1. Clear Basic Info Fields
+    basicFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) field.value = '';
+    });
+
+    // 2. Remove extra experience rows (keep only the first one)
+    for (let i = 1; i < rows.length; i++) {
+        rows[i].remove();
+    }
+    
+    // 3. Clear ALL inputs AND selects in the first experience row
+    const firstRow = container.querySelector('.experience-row');
+    if (firstRow) {
+        // This targets inputs, selects, and textareas
+        const elements = firstRow.querySelectorAll('input, select, textarea');
+        elements.forEach(el => {
+            el.value = '';
+            // If it's a dropdown, ensure it resets to the first/empty option
+            if (el.tagName === 'SELECT') {
+                el.selectedIndex = 0;
+            }
+        });
+    }
+
+    // 4. Re-enable and reset the Submit Button state
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Submit Transfer Request";
+        submitBtn.style.backgroundColor = ""; 
+        submitBtn.classList.remove('bg-red-400', 'opacity-50');
+    }
+
+    // 5. Clear the read-only history box
+    const historyContainer = document.getElementById('fetchedExperienceContainer');
+    if (historyContainer) historyContainer.innerHTML = '';
+}
+
+function fetchStaffForUpdate() {
+    const idInput = document.getElementById('updateIdSearch');
+    const btn = document.getElementById('fetchBtn');
+    const id = idInput.value.trim();
+    const userEmail = (typeof currentUser !== 'undefined' && currentUser.email) ? currentUser.email : "";
+
+    if (!id) return alert("Please enter a Unique ID");
+
+    btn.innerText = "Searching...";
+    btn.disabled = true;
+
+    google.script.run
+        .withSuccessHandler(staff => {
+            if (staff) {
+                idInput.value = '';
+                const form = document.getElementById('staffForm');
+                const staffSection = document.getElementById('staffSection');
+                const submitBtn = document.getElementById('submitBtn');
+                
+                // 1. HIDE FEES SECTION (Targets the parent container you shared)
+                const feesContainer = document.getElementById('feesContainer');
+                if (feesContainer) feesContainer.classList.add('hidden');
+
+                // Ensure staff section is visible
+                if (staffSection) staffSection.classList.remove('hidden');
+                
+                if (submitBtn) {
+                    submitBtn.classList.remove('hidden', 'bg-blue-600');
+                    submitBtn.classList.add('bg-orange-600');
+                    submitBtn.innerText = "Update Staff Details";
+                    submitBtn.disabled = false;
+                }
+
+                // Reset all elements to default state
+                Array.from(form.elements).forEach(el => {
+                    el.disabled = false;
+                    el.readOnly = false;
+                    el.style.pointerEvents = "auto";
+                    el.classList.remove('bg-gray-100', 'cursor-not-allowed');
+                });
+
+                const hiddenIdField = document.getElementById('field-id');
+                if (hiddenIdField) hiddenIdField.value = staff.id;
+
+                Object.keys(staff).forEach(key => {
+                    const field = form.elements[key];
+                    if (field) {
+                        field.value = staff[key];
+                        if (key === 'dob' && typeof calculateAge === 'function') calculateAge(field);
+                    }
+                });
+
+                /** 2. LOCK ONLY IDENTITY FIELDS **/
+                // Only name, dob, and designation are locked. 
+                // Payment fields are hidden, so they don't need to be in this list.
+                const lockList = ['name', 'dob', 'designation'];
+                lockList.forEach(name => {
+                    const el = form.elements[name];
+                    if (el) {
+                        el.readOnly = true;
+                        el.style.pointerEvents = "none";
+                        el.classList.add('bg-gray-100', 'cursor-not-allowed');
+                    }
+                });
+
+                // Fetch Experience Data
+                google.script.run.withSuccessHandler(expList => {
+                    btn.innerText = "Fetch Data";
+                    btn.disabled = false;
+                    // ... (rest of experience logic remains same)
+                }).getStaffExperience(id);
+
+            } else {
+                btn.innerText = "Fetch Data";
+                btn.disabled = false;
+                alert("No record found.");
+            }
+        })
+        .withFailureHandler(err => {
+            btn.innerText = "Fetch Data";
+            btn.disabled = false;
+            alert("Error: " + err);
+        })
+        .getStaffData(id, userEmail);
+}
+
+
+function validateNameFormat(input) {
+    // Force uppercase and instantly remove dots or periods
+    let currentText = input.value.toUpperCase();
+    input.value = currentText.replace(/[\.\,]/g, "");
+
+    const nameValue = input.value.trim();
+    
+    // Regex: Matches letters/spaces, followed by one or more single trailing initial letters
+    // This safely accepts both "JAYAKUMAR K" and "JAYA KUMAR K" without changing them
+    const validNamePattern = /^[A-Z\s]+\s[A-Z](\s[A-Z])*$/;
+
+    if (nameValue === "") {
+        input.classList.remove('border-green-500', 'border-red-500');
+        return;
+    }
+
+    if (validNamePattern.test(nameValue)) {
+        input.classList.remove('border-red-500');
+        input.classList.add('border-green-500');
+        input.setCustomValidity(""); 
+    } else {
+        input.classList.remove('border-green-500');
+        input.classList.add('border-red-500');
+        input.setCustomValidity("Please enter your name followed by your initial(s). Do not use dots.");
+    }
+}
+
+
+
+
+document.getElementById('photoFile').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    const errorMsg = document.getElementById('sizeError');
+    const previewContainer = document.getElementById('photoPreviewContainer');
+    const previewImg = document.getElementById('photoPreview');
+    const maxSize = 20 * 1024; // 20KB in bytes
+
+    if (file) {
+        // 1. Check File Size
+        if (file.size > maxSize) {
+            errorMsg.classList.remove('hidden');
+            previewContainer.classList.add('hidden');
+            this.value = ""; // Clear the input
+            return;
+        }
+
+        // 2. Hide Error if Valid
+        errorMsg.classList.add('hidden');
+
+        // 3. Show Image Preview
+        // Use URL.createObjectURL to create a temporary link for the selected image
+        previewImg.src = URL.createObjectURL(file);
+        previewContainer.classList.remove('hidden');
+
+        // 4. Free memory once image is loaded
+        previewImg.onload = function() {
+            URL.revokeObjectURL(previewImg.src);
+        };
+    } else {
+        // Reset if no file is selected
+        previewContainer.classList.add('hidden');
+    }
+});
+
+
+
+
+
+</script>
+      
+  </div>
+</div>
+
+
+</body>
+</html>
+
+
